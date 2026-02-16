@@ -159,6 +159,17 @@
         .settings-section { background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .settings-section h3 { margin: 0 0 15px 0; font-size: 1rem; color: var(--text-sub); border-bottom: 1px solid #eee; padding-bottom: 10px; }
         
+        .settings-deck-list { list-style: none; padding: 0; margin: 0; border: 1px solid #f3f4f6; border-radius: 12px; overflow: hidden; }
+        .settings-deck-list li { padding: 14px 16px; background: white; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; }
+        .settings-deck-list li:last-child { border-bottom: none; }
+        
+        .deck-name-row { font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+        .deck-count-badge { background: #f3f4f6; color: var(--text-sub); padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+        .action-icon-btn { background: none; border: none; padding: 8px; border-radius: 8px; cursor: pointer; color: var(--text-sub); transition: background 0.2s; font-size: 1.1rem; line-height: 1; }
+        .action-icon-btn:hover { background: #f3f4f6; color: var(--text); }
+        .action-icon-btn.danger { color: #fca5a5; }
+        .action-icon-btn.danger:hover { background: #fef2f2; color: var(--danger); }
+
         .manager-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
         .manager-item {
             background: white; padding: 16px; border-radius: 12px; margin-bottom: 10px;
@@ -186,7 +197,11 @@
         /* --- モーダル・共通 --- */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
         .modal.active { display: flex; }
-        .modal-content { background: white; padding: 24px; border-radius: 20px; width: 90%; max-width: 400px; }
+        .modal-content { 
+            background: white; padding: 24px; border-radius: 20px; 
+            width: 90%; max-width: 400px;
+            box-sizing: border-box; max-height: 90vh; overflow-y: auto;
+        }
         
         .input-group { margin-bottom: 16px; }
         .input-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem; color: var(--text-sub); }
@@ -665,14 +680,20 @@
     function renderSettingsDeckList() {
         const list = document.getElementById('settings-deck-list');
         list.innerHTML = '';
+        if (appData.decks.length === 0) {
+            list.innerHTML = '<li style="padding:20px; text-align:center; color:var(--text-sub);">デッキがありません</li>';
+            return;
+        }
         appData.decks.forEach(deck => {
             const li = document.createElement('li');
-            li.className = 'settings-deck-item';
             li.innerHTML = `
-                <div style="font-weight:bold;">${deck.name} (${deck.cards.length})</div>
-                <div style="display:flex; gap:5px;">
-                    <button class="secondary-btn" style="margin:0; padding:5px 10px; font-size:0.8rem;" onclick="renameDeck('${deck.id}')">名前変更</button>
-                    <button class="secondary-btn" style="margin:0; padding:5px 10px; font-size:0.8rem; color:var(--danger);" onclick="deleteDeck('${deck.id}')">削除</button>
+                <div class="deck-name-row">
+                    <span>${deck.name}</span>
+                    <span class="deck-count-badge">${deck.cards.length}</span>
+                </div>
+                <div class="deck-actions-row" style="display:flex; gap:4px;">
+                    <button class="action-icon-btn" title="名前変更" onclick="renameDeck('${deck.id}')">✏️</button>
+                    <button class="action-icon-btn danger" title="削除" onclick="deleteDeck('${deck.id}')">🗑️</button>
                 </div>
             `;
             list.appendChild(li);
@@ -745,11 +766,14 @@
     
     document.getElementById('card-scene').addEventListener('click', () => {
         const cardObj = document.getElementById('card-obj');
-        if (!cardObj.classList.contains('is-flipped') && currentCard) {
-            cardObj.classList.add('is-flipped');
-            document.getElementById('controls').classList.add('visible');
+        if (!currentCard) return;
+
+        const controls = document.getElementById('controls');
+        if (!controls.classList.contains('visible')) {
+            controls.classList.add('visible');
             updateButtonLabels();
         }
+        cardObj.classList.toggle('is-flipped');
     });
 
     function calculateNextState(card, rating) {
