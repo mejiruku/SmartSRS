@@ -137,9 +137,12 @@
         .q-label { color: var(--primary); font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
         .a-label { color: var(--text-sub); font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
 
-        .q-text { font-size: 1.5rem; font-weight: bold; line-height: 1.4; word-break: break-word; }
-        .a-text { font-size: 1.75rem; font-weight: bold; color: var(--primary); line-height: 1.4; word-break: break-word; }
-        .exp-text { font-size: 0.95rem; color: var(--text-sub); line-height: 1.6; margin-top: 16px; overflow-y: auto; max-height: 100px; width: 100%; }
+        .q-text { font-size: 1.5rem; font-weight: bold; line-height: 1.4; word-break: break-word; overflow-y: auto; flex: 1; }
+        .a-text { font-size: 1.75rem; font-weight: bold; color: var(--primary); line-height: 1.4; word-break: break-word; margin-bottom: 10px; }
+        .exp-text { font-size: 0.95rem; color: var(--text-sub); line-height: 1.6; overflow-y: auto; flex: 1; width: 100%; text-align: left; padding: 0 10px; box-sizing: border-box; }
+
+        .progress-container { width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; overflow: hidden; margin-bottom: 15px; }
+        .progress-bar { height: 100%; background: var(--primary); width: 0%; transition: width 0.3s ease; }
 
         .controls-container { margin-top: auto; width: 100%; padding-bottom: 10px; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -286,13 +289,16 @@
 </div>
 
 <div class="container" id="study-view">
-    <header>
-        <button class="icon-btn" onclick="backToDecks()">←</button>
-        <h1 id="study-title" style="font-size:1rem;">Deck Title</h1>
-        <div class="header-actions">
-            <button id="btnUndo" class="icon-btn" onclick="handleUndo()" disabled title="1つ戻る">↩️</button>
-            <button class="icon-btn" onclick="openManager()">📝</button>
+    <header style="display:flex; flex-direction:column; align-items:stretch;">
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:10px;">
+            <button class="icon-btn" onclick="backToDecks()">←</button>
+            <h1 id="study-title" style="font-size:1rem;">Deck Title</h1>
+            <div class="header-actions">
+                <button id="btnUndo" class="icon-btn" onclick="handleUndo()" disabled title="1つ戻る">↩️</button>
+                <button class="icon-btn" onclick="openManager()">📝</button>
+            </div>
         </div>
+        <div class="progress-container"><div class="progress-bar" id="study-progress"></div></div>
     </header>
 
     <div class="scene" id="card-scene">
@@ -338,7 +344,10 @@
     <header>
         <button class="icon-btn" onclick="closeManager()">←</button>
         <h1>カード編集</h1>
-        <button class="icon-btn" onclick="showDeckMenu()">📥</button>
+        <div style="display:flex;gap:5px;">
+             <button class="icon-btn" onclick="deleteSelectedCards()" id="btn-bulk-delete" style="display:none; color:var(--danger);">🗑️</button>
+             <button class="icon-btn" onclick="showDeckMenu()">📥</button>
+        </div>
     </header>
     <div class="input-group">
         <input type="text" id="search-input" placeholder="検索..." oninput="renderManagerList()">
@@ -372,7 +381,7 @@
 <div id="modal-import" class="modal">
     <div class="modal-content">
         <h3>ファイル読込 (このデッキへ)</h3>
-        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">CSV形式: id,question,answer,explanation</p>
+        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">TSV形式(タブ区切り): id, question, answer, explanation</p>
         <input type="file" id="fileInput" accept=".csv,.json">
         <button class="primary-btn" onclick="handleImport()" style="margin-top:15px;">インポート実行</button>
         <button class="secondary-btn" onclick="closeModals()">閉じる</button>
@@ -382,7 +391,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyCLJG-ExZC7dVOcSL0Tfzdv965ewCj_uGs",
@@ -454,30 +463,46 @@
 
     async function loadDataFromCloud() {
         if (!currentUser) return;
-        const userDocRef = doc(db, "users", currentUser.uid);
+        const decksCol = collection(db, "users", currentUser.uid, "decks");
         try {
-            const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) { appData = docSnap.data().appData; } else {
-                const localData = localStorage.getItem(STORAGE_KEY);
-                if (localData) {
-                    if (confirm("以前のローカルデータが見つかりました。クラウドに引き継ぎますか？")) {
-                        appData = JSON.parse(localData); await saveDataToCloud(); 
-                    } else { initDefaultData(); }
-                } else { initDefaultData(); }
+            const snp = await getDocs(decksCol);
+            if (!snp.empty) {
+                appData.decks = snp.docs.map(d => d.data());
+            } else {
+                // Legacy check
+                const userDocRef = doc(db, "users", currentUser.uid);
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists() && docSnap.data().appData) {
+                    appData = docSnap.data().appData;
+                    // Migrate
+                    for (const deck of appData.decks) {
+                        await saveDeckToCloud(deck);
+                    }
+                } else {
+                     initDefaultData();
+                }
             }
         } catch (error) { console.error(error); alert("読込失敗"); }
     }
 
-    async function saveDataToCloud() {
+    async function saveDeckToCloud(deck) {
+        if (!currentUser || !deck) return;
+        try {
+            await setDoc(doc(db, "users", currentUser.uid, "decks", deck.id), deck);
+        } catch (e) { console.error(e); }
+    }
+
+    async function deleteDeckFromCloud(deckId) {
         if (!currentUser) return;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-        const userDocRef = doc(db, "users", currentUser.uid);
-        try { await setDoc(userDocRef, { appData: appData }, { merge: true }); } catch (error) { console.error(error); }
+        try {
+            await deleteDoc(doc(db, "users", currentUser.uid, "decks", deckId));
+        } catch (e) { console.error(e); }
     }
 
     function initDefaultData() {
-        appData = { decks: [{ id: 'd1', name: '新規デッキ', cards: [] }] };
-        saveDataToCloud();
+        const newDeck = { id: 'd1', name: '新規デッキ', cards: [] };
+        appData = { decks: [newDeck] };
+        saveDeckToCloud(newDeck);
     }
 
     window.openSettings = () => { switchView('settings-view'); renderSettingsDeckList(); };
@@ -488,8 +513,9 @@
     window.createDeck = () => {
         const name = document.getElementById('new-deck-name').value;
         if(name) {
-            appData.decks.push({ id:'d_'+Date.now(), name, cards:[] });
-            saveDataToCloud(); renderDeckList(); window.closeModals();
+            const newDeck = { id:'d_'+Date.now(), name, cards:[] };
+            appData.decks.push(newDeck);
+            saveDeckToCloud(newDeck); renderDeckList(); window.closeModals();
             document.getElementById('new-deck-name').value = '';
         }
     };
@@ -499,16 +525,27 @@
         const deck = appData.decks.find(d => d.id === id);
         if(!deck) return;
         document.getElementById('study-title').innerText = deck.name;
+        // Total cards for progress calculation
+        window.sessionTotal = deck.cards.filter(c => c.dueDate <= Date.now()).length; 
+        if(window.sessionTotal === 0 && deck.cards.length > 0) window.sessionTotal = deck.cards.length; // If cram mode or all done, just use total? Adjusted in refreshQueue
         switchView('study-view'); refreshQueue();
     };
 
     window.openManager = () => { switchView('manager-view'); renderManagerList(); };
     window.closeManager = () => { switchView('study-view'); refreshQueue(); };
     window.showDeckMenu = () => document.getElementById('modal-import').classList.add('active');
-    window.startCramMode = () => { isCramMode = true; sessionReviewedIds.clear(); historyStack = []; refreshQueue(); };
+    window.startCramMode = () => { 
+        isCramMode = true; sessionReviewedIds.clear(); historyStack = []; 
+        const deck = appData.decks.find(d => d.id === currentDeckId);
+        window.sessionTotal = deck.cards.length;
+        refreshQueue(); 
+    };
     
     window.rateCard = (rating) => {
         if (!currentCard) return;
+        // Disable buttons to prevent double submission
+        document.querySelectorAll('.rate-btn').forEach(btn => btn.disabled = true);
+        
         const cardStateCopy = JSON.parse(JSON.stringify(currentCard));
         historyStack.push({ card: cardStateCopy, isCramMode: isCramMode });
         updateUndoButton();
@@ -517,7 +554,8 @@
         const idx = deck.cards.findIndex(c => c.id === currentCard.id);
         const next = calculateNextState(currentCard, rating);
         deck.cards[idx] = { ...currentCard, ...next };
-        saveDataToCloud(); refreshQueue();
+        deck.cards[idx] = { ...currentCard, ...next };
+        saveDeckToCloud(deck); refreshQueue();
     };
 
     window.handleUndo = () => {
@@ -528,7 +566,9 @@
         const idx = deck.cards.findIndex(c => c.id === prevCard.id);
         if (idx !== -1) deck.cards[idx] = prevCard;
         if (prevState.isCramMode) sessionReviewedIds.delete(prevCard.id);
-        saveDataToCloud(); refreshQueue(); updateUndoButton();
+        if (idx !== -1) deck.cards[idx] = prevCard;
+        if (prevState.isCramMode) sessionReviewedIds.delete(prevCard.id);
+        saveDeckToCloud(deck); refreshQueue(); updateUndoButton();
     };
 
     function updateUndoButton() {
@@ -576,14 +616,14 @@
         } else {
             deck.cards.push({ id: 'c_' + Date.now(), displayId: did, question: q, answer: a, explanation: e, dueDate: 0, interval: 0, reps: 0, ef: 2.5 });
         }
-        saveDataToCloud(); window.closeModals(); renderManagerList();
+        saveDeckToCloud(deck); window.closeModals(); renderManagerList();
     };
 
     window.deleteCard = () => {
         if (!confirm("削除しますか？")) return;
         const deck = appData.decks.find(d => d.id === currentDeckId);
         deck.cards = deck.cards.filter(c => c.id !== editingCardId);
-        saveDataToCloud(); window.closeModals(); renderManagerList();
+        saveDeckToCloud(deck); window.closeModals(); renderManagerList();
     };
 
     window.handleImport = () => {
@@ -598,8 +638,7 @@
                 const lines = content.trim().split('\n');
                 let added = 0;
                 lines.forEach((l, i) => {
-                    if(i===0 && l.includes('question')) return;
-                    const c = l.split(',');
+                    const c = l.split('\t'); // TSV
                     if(c.length>=2) {
                         deck.cards.push({
                             id: 'imp_'+Date.now()+i, displayId: c[0] || "",
@@ -609,7 +648,7 @@
                         added++;
                     }
                 });
-                saveDataToCloud(); window.closeModals(); renderManagerList();
+                saveDeckToCloud(deck); window.closeModals(); renderManagerList();
                 alert(`${added}件インポート完了`); refreshQueue();
             } catch(err) { alert("エラー: " + err); }
         };
@@ -631,9 +670,16 @@
             try {
                 const data = JSON.parse(e.target.result);
                 if (data.decks) {
-                    if (confirm("上書き復元しますか？")) { appData = data; await saveDataToCloud(); alert("復元完了"); renderSettingsDeckList(); }
+                    if (confirm("上書き復元しますか？現在のデータは消去され、バックアップデータで上書きされます。")) {
+                        // Delete all existing decks first
+                        for(const d of appData.decks) { await deleteDeckFromCloud(d.id); }
+                        appData = data; 
+                        // Save all restored decks
+                        for(const d of appData.decks) { await saveDeckToCloud(d); }
+                        alert("復元完了"); renderSettingsDeckList(); 
+                    }
                 }
-            } catch (err) { alert("読込失敗"); }
+            } catch (err) { alert("読込失敗"); console.error(err); }
         };
         reader.readAsText(file); input.value = '';
     };
@@ -641,11 +687,15 @@
     window.renameDeck = (id) => {
         const deck = appData.decks.find(d => d.id === id);
         const name = prompt("新しい名前:", deck.name);
-        if(name && name!==deck.name) { deck.name=name; saveDataToCloud(); renderSettingsDeckList(); }
+        if(name && name!==deck.name) { deck.name=name; saveDeckToCloud(deck); renderSettingsDeckList(); }
     };
 
     window.deleteDeck = (id) => {
-        if(confirm("削除しますか？")) { appData.decks = appData.decks.filter(d => d.id !== id); saveDataToCloud(); renderSettingsDeckList(); }
+        if(confirm("削除しますか？")) { 
+            appData.decks = appData.decks.filter(d => d.id !== id); 
+            deleteDeckFromCloud(id); 
+            renderSettingsDeckList(); 
+        }
     };
 
     function switchView(viewId) {
@@ -706,13 +756,19 @@
         const deck = appData.decks.find(d => d.id === currentDeckId);
         if (!deck) return;
         const term = document.getElementById('search-input').value.toLowerCase();
+        
+        // Show/Hide bulk delete button
+        const btnBulk = document.getElementById('btn-bulk-delete');
+        btnBulk.style.display = 'none'; // hidden initially or when list rerenders
+        
         [...deck.cards].reverse().forEach(card => {
             if (term && !card.question.toLowerCase().includes(term)) return;
             const li = document.createElement('li');
             li.className = 'manager-item';
             const numLabel = card.displayId ? `[${card.displayId}] ` : "";
             li.innerHTML = `
-                <div class="item-text">${numLabel}${card.question}</div>
+                <input type="checkbox" class="card-chk" value="${card.id}" onchange="toggleBulkButton()" style="margin-right:10px; transform:scale(1.2);">
+                <div class="item-text" onclick="openEditModal('${card.id}')">${numLabel}${card.question}</div>
                 <div class="item-actions">
                     <button class="secondary-btn" style="margin:0; padding:5px 10px;" onclick="openEditModal('${card.id}')">編集</button>
                 </div>
@@ -720,6 +776,22 @@
             list.appendChild(li);
         });
     }
+
+    window.toggleBulkButton = () => {
+        const anyChecked = document.querySelectorAll('.card-chk:checked').length > 0;
+        document.getElementById('btn-bulk-delete').style.display = anyChecked ? 'block' : 'none';
+    };
+
+    window.deleteSelectedCards = () => {
+        const checked = document.querySelectorAll('.card-chk:checked');
+        if(checked.length === 0) return;
+        if(!confirm(`${checked.length}枚のカードを削除しますか？`)) return;
+        
+        const ids = Array.from(checked).map(c => c.value);
+        const deck = appData.decks.find(d => d.id === currentDeckId);
+        deck.cards = deck.cards.filter(c => !ids.includes(c.id));
+        saveDeckToCloud(deck); renderManagerList();
+    };
 
     function refreshQueue() {
         const deck = appData.decks.find(d => d.id === currentDeckId);
@@ -730,6 +802,18 @@
         } else {
             studyQueue = deck.cards.filter(c => c.dueDate <= now).sort((a,b) => a.dueDate - b.dueDate);
         }
+
+        // Update Progress Bar
+        const total = window.sessionTotal || 1; 
+        const studied = sessionReviewedIds.size;
+        // For standard mode, sessionTotal is typically fixed at start. 
+        // If we want simple progress: reviewed / (reviewed + remaining in queue)
+        // But queue length changes. Let's use sessionReviewedIds.size vs initial count.
+        // Simplified approach: progress = reviewed / (reviewed + queue.length)
+        const currentTotal = studied + studyQueue.length;
+        const pct = currentTotal > 0 ? (studied / currentTotal) * 100 : 100;
+        document.getElementById('study-progress').style.width = pct + '%';
+
         if (studyQueue.length === 0) {
             document.getElementById('card-scene').classList.add('hidden');
             document.getElementById('controls').classList.remove('visible');
@@ -752,6 +836,9 @@
 
     function renderCard() {
         const cardObj = document.getElementById('card-obj');
+        // Re-enable buttons
+        document.querySelectorAll('.rate-btn').forEach(btn => btn.disabled = false);
+        
         document.getElementById('controls').classList.remove('visible');
         cardObj.classList.remove('is-flipped');
         setTimeout(() => {
