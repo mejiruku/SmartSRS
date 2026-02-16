@@ -1,189 +1,290 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>SmartSRS</title>
-    <meta name="data-app-version" content="1.0.0Beta1">
-    <link rel="icon" href="img/logo.png">
-    <link rel="apple-touch-icon" href="img/logo.png">
-    <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+    <meta name="data-app-version" content="1.0.0" />
+    <link rel="icon" href="img/logo.png" />
+    <link rel="apple-touch-icon" href="img/logo.png" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="loading" class="loading-overlay"><div class="spinner"></div></div>
 
-<div id="loading" class="loading-overlay"><div class="spinner"></div></div>
-
-<div id="auth-view">
-    <div class="auth-box">
+    <div id="auth-view">
+      <div class="auth-box">
         <h1>Smart SRS</h1>
-        <p>学習データをクラウドに保存します。<br>ログインしてください。</p>
+        <p>学習データをクラウドに保存します。<br />ログインしてください。</p>
         <div id="auth-error" class="error-msg"></div>
-        
+
         <div class="input-group">
-            <input type="email" id="email" placeholder="メールアドレス" required onkeydown="checkLoginEnter(event)">
+          <input
+            type="email"
+            id="email"
+            placeholder="メールアドレス"
+            required
+            onkeydown="checkLoginEnter(event)"
+          />
         </div>
         <div class="input-group">
-            <input type="password" id="password" placeholder="パスワード" required onkeydown="checkLoginEnter(event)">
+          <input
+            type="password"
+            id="password"
+            placeholder="パスワード"
+            required
+            onkeydown="checkLoginEnter(event)"
+          />
         </div>
-        
+
         <button id="btnLogin" class="primary-btn">ログイン</button>
         <button id="btnSignup" class="secondary-btn">新規登録</button>
-        <button onclick="resetPassword()" class="text-link">パスワードを忘れた方</button>
+        <button onclick="resetPassword()" class="text-link">
+          パスワードを忘れた方
+        </button>
+      </div>
     </div>
-</div>
 
-<div class="container" id="deck-list-view">
-    <header>
+    <div class="container" id="deck-list-view">
+      <header>
         <h1>📚 My Decks</h1>
         <div class="header-actions">
-            <button class="icon-btn" onclick="openSettings()">⚙️</button>
-            <button class="icon-btn" onclick="showAddDeckModal()">➕</button>
+          <button class="icon-btn" onclick="openSettings()">⚙️</button>
+          <button class="icon-btn" onclick="showAddDeckModal()">➕</button>
         </div>
-    </header>
-    <div id="next-study-info" class="next-study-info">
+      </header>
+      <div id="next-study-info" class="next-study-info">
         <span class="next-study-icon">📅</span>
         <div>
-            <div class="next-study-label">次の学習</div>
-            <div id="next-study-text" class="next-study-value">---</div>
+          <div class="next-study-label">次の学習</div>
+          <div id="next-study-text" class="next-study-value">---</div>
         </div>
+      </div>
+      <div id="deck-grid" class="deck-grid"></div>
     </div>
-    <div id="deck-grid" class="deck-grid"></div>
-</div>
 
-<div class="container" id="settings-view">
-    <header>
+    <div class="container" id="settings-view">
+      <header>
         <button class="icon-btn" onclick="backToDecks()">←</button>
         <h1>設定</h1>
         <div class="spacer-40"></div>
-    </header>
+      </header>
 
-    <div class="settings-section">
+      <div class="settings-section">
         <h3>アカウント</h3>
         <p id="user-email-display" class="user-email-display"></p>
-        <button class="btn-block" onclick="handleLogout()" style="color:var(--danger); border-color:#fecaca;">
-            ログアウト
+        <button class="btn-block btn-logout" onclick="handleLogout()">
+          ログアウト
         </button>
-    </div>
+      </div>
 
-    <div class="settings-section">
+      <div class="settings-section">
         <h3>データ管理</h3>
-        <button class="btn-block" onclick="exportAllData()">📤 JSONバックアップ保存</button>
-        <button class="btn-block" onclick="document.getElementById('restoreInput').click()">📥 JSON復元 (読込)</button>
-        <input type="file" id="restoreInput" accept=".json" style="display:none;" onchange="restoreData(this)">
-    </div>
-    
-    <div class="settings-section">
+        <button class="btn-block btn-data" onclick="exportAllData()">
+          📤 JSONバックアップ保存
+        </button>
+        <button
+          class="btn-block btn-data"
+          onclick="document.getElementById('restoreInput').click()"
+        >
+          📥 JSON復元 (読込)
+        </button>
+        <input
+          type="file"
+          id="restoreInput"
+          accept=".json"
+          style="display: none"
+          onchange="restoreData(this)"
+        />
+      </div>
+
+      <div class="settings-section">
         <h3>デッキ管理</h3>
         <ul class="settings-deck-list" id="settings-deck-list"></ul>
-    </div>
+      </div>
 
-    <div style="margin-top:20px; text-align:center; color:var(--text-sub); font-size:0.8rem;">
+      <div
+        style="
+          margin-top: 20px;
+          text-align: center;
+          color: var(--text-sub);
+          font-size: 0.8rem;
+        "
+      >
         Version: <span id="app-version"></span>
+      </div>
     </div>
-</div>
 
-<div class="container" id="study-view">
-    <header class="flex-stretch">
+    <div class="container" id="study-view">
+      <header class="flex-stretch">
         <div class="study-header-actions">
-            <button class="icon-btn" onclick="backToDecks()">←</button>
-            <h1 id="study-title" class="study-title">Deck Title</h1>
-            <div class="header-actions">
-                <button id="btnUndo" class="icon-btn" onclick="handleUndo()" disabled title="1つ戻る">↩️</button>
-                <button class="icon-btn" onclick="openManager()">📝</button>
-            </div>
+          <button class="icon-btn" onclick="backToDecks()">←</button>
+          <h1 id="study-title" class="study-title">Deck Title</h1>
+          <div class="header-actions">
+            <button
+              id="btnUndo"
+              class="icon-btn"
+              onclick="handleUndo()"
+              disabled
+              title="1つ戻る"
+            >
+              ↩️
+            </button>
+            <button class="icon-btn" onclick="openManager()">📝</button>
+          </div>
         </div>
-        <div class="progress-container"><div class="progress-bar" id="study-progress"></div></div>
-    </header>
+        <div class="progress-container">
+          <div class="progress-bar" id="study-progress"></div>
+        </div>
+      </header>
 
-    <div class="scene" id="card-scene">
+      <div class="scene" id="card-scene">
         <div class="card" id="card-obj">
-            <div class="card__face card__face--front">
-                <div class="card-header"><div class="card-number" id="q-num"></div></div>
-                <div class="card-body">
-                    <div class="q-label">QUESTION</div>
-                    <div class="q-text" id="q-text"></div>
-                </div>
-                <div class="card-footer">Tap to Flip</div>
+          <div class="card__face card__face--front">
+            <div class="card-header">
+              <div class="card-number" id="q-num"></div>
             </div>
-            <div class="card__face card__face--back">
-                <div class="card-header"><div class="card-number" id="a-num"></div></div>
-                <div class="card-body">
-                    <div class="a-label">ANSWER</div>
-                    <div class="a-text" id="a-text"></div>
-                    <div class="exp-text" id="exp-text"></div>
-                </div>
-                <div class="card-footer"></div>
+            <div class="card-body">
+              <div class="q-label">QUESTION</div>
+              <div class="q-text" id="q-text"></div>
             </div>
+            <div class="card-footer">Tap to Flip</div>
+          </div>
+          <div class="card__face card__face--back">
+            <div class="card-header">
+              <div class="card-number" id="a-num"></div>
+            </div>
+            <div class="card-body">
+              <div class="a-label">ANSWER</div>
+              <div class="a-text" id="a-text"></div>
+              <div class="exp-text" id="exp-text"></div>
+            </div>
+            <div class="card-footer"></div>
+          </div>
         </div>
-    </div>
+      </div>
 
-    <div class="empty-state hidden" id="empty-state">
+      <div class="empty-state hidden" id="empty-state">
         <h2 class="empty-state-title">🎉 コンプリート！</h2>
-        <p class="empty-state-text">今のところ、学習すべきカードはありません。</p>
-        <button class="primary-btn btn-cram mt-20" onclick="startCramMode()">残りも学習する (先取り)</button>
-        <button class="secondary-btn" onclick="backToDecks()">デッキ一覧に戻る</button>
-    </div>
+        <p class="empty-state-text">
+          今のところ、学習すべきカードはありません。
+        </p>
+        <button class="primary-btn btn-cram mt-20" onclick="startCramMode()">
+          残りも学習する (先取り)
+        </button>
+        <button class="secondary-btn" onclick="backToDecks()">
+          デッキ一覧に戻る
+        </button>
+      </div>
 
-    <div class="controls-container">
+      <div class="controls-container">
         <div class="controls" id="controls">
-            <button class="rate-btn btn-again" onclick="rateCard(1)">Again <span id="lbl-again">1m</span></button>
-            <button class="rate-btn btn-hard" onclick="rateCard(2)">Hard <span id="lbl-hard">2d</span></button>
-            <button class="rate-btn btn-good" onclick="rateCard(3)">Good <span id="lbl-good">4d</span></button>
-            <button class="rate-btn btn-easy" onclick="rateCard(4)">Easy <span id="lbl-easy">7d</span></button>
+          <button class="rate-btn btn-again" onclick="rateCard(1)">
+            Again <span id="lbl-again">1m</span>
+          </button>
+          <button class="rate-btn btn-hard" onclick="rateCard(2)">
+            Hard <span id="lbl-hard">2d</span>
+          </button>
+          <button class="rate-btn btn-good" onclick="rateCard(3)">
+            Good <span id="lbl-good">4d</span>
+          </button>
+          <button class="rate-btn btn-easy" onclick="rateCard(4)">
+            Easy <span id="lbl-easy">7d</span>
+          </button>
         </div>
+      </div>
     </div>
-</div>
 
-<div class="container" id="manager-view">
-    <header>
+    <div class="container" id="manager-view">
+      <header>
         <button class="icon-btn" onclick="closeManager()">←</button>
         <h1>カード編集</h1>
         <div class="gap-5">
-             <button class="icon-btn btn-delete-card" onclick="deleteSelectedCards()" id="btn-bulk-delete">🗑️</button>
-             <button class="icon-btn" onclick="showDeckMenu()">📥</button>
+          <button
+            class="icon-btn btn-delete-card"
+            onclick="deleteSelectedCards()"
+            id="btn-bulk-delete"
+          >
+            🗑️
+          </button>
+          <button class="icon-btn" onclick="showDeckMenu()">📥</button>
         </div>
-    </header>
-    <div class="input-group">
-        <input type="text" id="search-input" placeholder="検索..." oninput="renderManagerList()">
+      </header>
+      <div class="input-group">
+        <input
+          type="text"
+          id="search-input"
+          placeholder="検索..."
+          oninput="renderManagerList()"
+        />
+      </div>
+      <ul class="manager-list" id="manager-list"></ul>
+      <div class="btn-add-float" onclick="openEditModal(null)">+</div>
     </div>
-    <ul class="manager-list" id="manager-list"></ul>
-    <div class="btn-add-float" onclick="openEditModal(null)">+</div>
-</div>
 
-<div id="modal-deck" class="modal">
-    <div class="modal-content">
+    <div id="modal-deck" class="modal">
+      <div class="modal-content">
         <h3>新規デッキ作成</h3>
-        <div class="input-group"><label>デッキ名</label><input type="text" id="new-deck-name"></div>
+        <div class="input-group">
+          <label>デッキ名</label><input type="text" id="new-deck-name" />
+        </div>
         <button class="primary-btn" onclick="createDeck()">作成</button>
-        <button class="secondary-btn" onclick="closeModals()">キャンセル</button>
+        <button class="secondary-btn" onclick="closeModals()">
+          キャンセル
+        </button>
+      </div>
     </div>
-</div>
 
-<div id="modal-card" class="modal">
-    <div class="modal-content">
+    <div id="modal-card" class="modal">
+      <div class="modal-content">
         <h3>カード編集</h3>
-        <div class="input-group"><label>番号 (No.)</label><input type="text" id="edit-display-id" placeholder="例: 1, 10-A"></div>
-        <div class="input-group"><label>問題 (Question)</label><textarea id="edit-q" rows="3"></textarea></div>
-        <div class="input-group"><label>答え (Answer)</label><textarea id="edit-a" rows="2"></textarea></div>
-        <div class="input-group"><label>解説 (Explanation)</label><textarea id="edit-e" rows="3"></textarea></div>
+        <div class="input-group">
+          <label>番号 (No.)</label
+          ><input type="text" id="edit-display-id" placeholder="例: 1, 10-A" />
+        </div>
+        <div class="input-group">
+          <label>問題 (Question)</label
+          ><textarea id="edit-q" rows="3"></textarea>
+        </div>
+        <div class="input-group">
+          <label>答え (Answer)</label><textarea id="edit-a" rows="2"></textarea>
+        </div>
+        <div class="input-group">
+          <label>解説 (Explanation)</label
+          ><textarea id="edit-e" rows="3"></textarea>
+        </div>
         <button class="primary-btn" onclick="saveCardEdit()">保存</button>
-        <button class="secondary-btn btn-edit-delete" onclick="deleteCard()" id="btn-delete">削除</button>
-        <button class="secondary-btn" onclick="closeModals()">キャンセル</button>
+        <button
+          class="secondary-btn btn-edit-delete"
+          onclick="deleteCard()"
+          id="btn-delete"
+        >
+          削除
+        </button>
+        <button class="secondary-btn" onclick="closeModals()">
+          キャンセル
+        </button>
+      </div>
     </div>
-</div>
 
-<div id="modal-import" class="modal">
-    <div class="modal-content">
+    <div id="modal-import" class="modal">
+      <div class="modal-content">
         <h3>ファイル読込 (このデッキへ)</h3>
-        <p class="file-input-desc">CSV(カンマ) または TSV(タブ)形式: id, question, answer, explanation</p>
-        <input type="file" id="fileInput" accept=".csv,.json,.tsv,.txt">
-        <button class="primary-btn import-btn" onclick="handleImport()">インポート実行</button>
+        <p class="file-input-desc">
+          CSV(カンマ) または TSV(タブ)形式: id, question, answer, explanation
+        </p>
+        <input type="file" id="fileInput" accept=".csv,.json,.tsv,.txt" />
+        <button class="primary-btn import-btn" onclick="handleImport()">
+          インポート実行
+        </button>
         <button class="secondary-btn" onclick="closeModals()">閉じる</button>
+      </div>
     </div>
-</div>
 
-<script type="module" src="js/script.js"></script>
-</body>
+    <script type="module" src="js/script.js"></script>
+  </body>
 </html>
