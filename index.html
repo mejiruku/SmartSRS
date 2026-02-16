@@ -1013,12 +1013,9 @@
         let { interval, reps, ef } = card;
         let nextInterval, nextReps, nextEf;
 
-        // 1. Calculate New EF (Easy Factor)
-        // Standard SM-2: EF' = EF + (0.1 - (5-q)*(0.08+(5-q)*0.02))
-        // q: 1=Again, 2=Hard, 3=Good, 4=Easy
-        // User Adjustments: Again(-0.2), Hard(-0.15), Good(0), Easy(+0.15)
-        // Minimum EF: 1.3
-        
+        // 1. EF（難易度係数）の更新
+        // Again: -0.2, Hard: -0.15, Good: 変化なし, Easy: +0.15
+        // 最低値: 1.3
         let drift = 0;
         if (rating === 1) drift = -0.2;
         else if (rating === 2) drift = -0.15;
@@ -1026,67 +1023,73 @@
         
         nextEf = Math.max(1.3, ef + drift);
 
-        // 2. Calculate Interval & Reps
-        // "Graduated" check: if interval >= 1 day (1440 min)
-        const isGraduated = interval >= 1;
+        // 2. フェーズ判定: ルーキー (reps === 0) / レビュー (reps >= 1)
+        const isRookie = reps === 0;
 
-        if (rating === 1) { // --- AGAIN (Lapse/Fail) ---
+        if (rating === 1) {
+            // --- AGAIN: repsを0にリセット → ルーキーに戻す ---
             nextReps = 0;
-            if (isGraduated) {
-                // Lapse: 20% of previous interval, min 1 day
-                nextInterval = Math.max(1, interval * 0.2);
-            } else {
-                // Learning Fail: 1 min
-                nextInterval = 0; // Means <1min (immediate)
-            }
-        } 
-        else if (!isGraduated) { // --- LEARNING PHASE (Interval < 1 day) ---
-            if (rating === 2) { // Hard
-                // 12 hours (0.5 days)
-                nextInterval = 0.5;
-                nextReps = 0; // Stay in learning?
-            } else if (rating === 3) { // Good
-                // Step logic: 1m -> 10m -> 1d
-                if (interval === 0) {
-                    nextInterval = 10 / 1440; // 10 min
-                    nextReps = reps; // Keep reps or inc? Let's say step 1 done.
-                } else {
-                    nextInterval = 1; // Graduate to 1 day
-                    nextReps = 1;
-                }
-            } else if (rating === 4) { // Easy
-                nextInterval = 4; // Graduate to 4 days
+            nextInterval = 0; // dueDate計算で10分後に設定
+        }
+        else if (isRookie) {
+            // --- ルーキーフェーズ: 固定ステップで卒業 ---
+            if (rating === 2) {       // Hard → 1日後
+                nextInterval = 1;
+                nextReps = 1;
+            } else if (rating === 3) { // Good → 2日後
+                nextInterval = 2;
+                nextReps = 1;
+            } else if (rating === 4) { // Easy → 4日後
+                nextInterval = 4;
                 nextReps = 1;
             }
-        } 
-        else { // --- REVIEW PHASE (Graduated) ---
-            if (rating === 2) { // Hard
-                nextInterval = interval * 1.2;
-            } else if (rating === 3) { // Good
-                nextInterval = interval * nextEf;
-            } else if (rating === 4) { // Easy
-                // Bonus 1.2 (User Request)
-                nextInterval = interval * nextEf * 1.2;
+        }
+        else {
+            // --- レビューフェーズ: EFベースの乗算 ---
+            const base = Math.max(interval, 1); // 最低1日をベースにする
+
+            if (rating === 2) {        // Hard: 前回と同じ or 1.2倍
+                nextInterval = base * 1.2;
+            } else if (rating === 3) { // Good: EFをフル適用
+                nextInterval = base * nextEf;
+            } else if (rating === 4) { // Easy: EF × 1.3ボーナス
+                nextInterval = base * nextEf * 1.3;
             }
+
+            // ガードレール: Good は最低でも Hard + 1日
+            if (rating === 3) {
+                const hardInterval = base * 1.2;
+                if (nextInterval <= hardInterval) {
+                    nextInterval = hardInterval + 1;
+                }
+            }
+            if (rating === 4) {
+                // Easy は Good 以上を保証（Goodの計算を再現）
+                let goodInterval = base * nextEf;
+                const hardInterval = base * 1.2;
+                if (goodInterval <= hardInterval) {
+                    goodInterval = hardInterval + 1;
+                }
+                if (nextInterval <= goodInterval) {
+                    nextInterval = goodInterval + 1;
+                }
+            }
+
             nextReps = reps + 1;
         }
 
-        // 3. Apply Fuzz (Random Scatter) for intervals > 3 days
+        // 3. Fuzz（ランダム散布）: 3日超の間隔に ±5% のゆらぎ
         if (nextInterval > 3) {
             const fuzz = 0.95 + Math.random() * 0.1; // 0.95 ~ 1.05
             nextInterval = nextInterval * fuzz;
         }
 
-        // Rounding: if interval is very small (learning steps), keep exact? 
-        // Logic uses days as base. 1 = 1 day.
-        // Display logic might round, but data can differ.
-        // Let's ensure dueDate is integer ms.
-        
+        // 4. dueDate の計算
         const now = Date.now();
         let dueDate;
         
         if (nextInterval === 0) {
-            dueDate = now + 60000; // 1 min
+            dueDate = now + 10 * 60 * 1000; // 10分後
         } else {
             dueDate = now + (nextInterval * 24 * 60 * 60 * 1000);
         }
@@ -1100,7 +1103,7 @@
             const res = calculateNextState(currentCard, r);
             const ids = ['lbl-again', 'lbl-hard', 'lbl-good', 'lbl-easy'];
             let txt;
-            if (res.interval === 0) txt = "1m";
+            if (res.interval === 0) txt = "10m";
             else if (res.interval < 1) { // e.g. 10m or 12h
                 const mins = Math.round(res.interval * 1440);
                 if (mins < 60) txt = mins + "m";
