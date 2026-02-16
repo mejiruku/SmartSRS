@@ -158,7 +158,16 @@ function initDefaultData() {
     appData = { decks: [] };
 }
 
-window.openSettings = () => { switchView('settings-view'); renderSettingsDeckList(); };
+window.openSettings = () => { 
+    switchView('settings-view'); 
+    renderSettingsDeckList(); 
+    
+    // Display App Version
+    const meta = document.querySelector('meta[name="data-app-version"]');
+    if (meta) {
+        document.getElementById('app-version').innerText = meta.content;
+    }
+};
 window.backToDecks = () => { switchView('deck-list-view'); renderDeckList(); sessionReviewedIds.clear(); historyStack = []; };
 window.showAddDeckModal = () => document.getElementById('modal-deck').classList.add('active');
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
