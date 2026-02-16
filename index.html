@@ -13,7 +13,6 @@
             --text: #1f2937;
             --text-sub: #6b7280;
             --danger: #ef4444;
-            
             --btn-again: #ef4444;
             --btn-hard: #f59e0b;
             --btn-good: #10b981;
@@ -28,7 +27,6 @@
             padding: 0;
             display: flex;
             flex-direction: column;
-            align-items: center;
             min-height: 100vh;
             -webkit-tap-highlight-color: transparent;
         }
@@ -41,33 +39,63 @@
             display: none; 
             flex-direction: column;
             flex: 1;
+            margin: 0 auto;
         }
 
-        /* --- 認証画面 --- */
+        /* --- ログイン画面のレスポンシブ強化 --- */
         #auth-view {
             display: flex;
             flex-direction: column;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             width: 100%;
-            min-height: 100vh;
+            min-height: 100dvh; /* 動的なビューポート高さに対応 */
             padding: 20px;
             box-sizing: border-box;
+            background-color: var(--bg);
         }
+
         .auth-box {
             background: white;
-            padding: 30px;
-            border-radius: 20px;
+            padding: clamp(20px, 5vw, 40px); /* 画面サイズに合わせてパディング調整 */
+            border-radius: 24px;
             width: 100%;
             max-width: 400px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             text-align: center;
-            margin: auto;
         }
-        .auth-box h2 { margin-top: 0; color: var(--primary); }
-        .error-msg { color: var(--danger); font-size: 0.9rem; margin-bottom: 10px; display: none; }
 
-        /* --- ヘッダー --- */
+        .auth-box h1 {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .auth-box p {
+            color: var(--text-sub);
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* 入力フォームの改善 */
+        .input-group input {
+            width: 100%;
+            padding: 14px;
+            box-sizing: border-box;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px; /* iOSの自動ズーム防止 */
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        /* --- ヘッダー・ボタン --- */
         header {
             display: flex;
             justify-content: space-between;
@@ -76,134 +104,53 @@
             padding: 12px 0;
         }
 
-        h1 { font-size: 1.25rem; margin: 0; font-weight: 800; color: var(--text); }
-        
-        .header-actions { display: flex; gap: 5px; }
+        .header-actions { display: flex; gap: 8px; }
 
         .icon-btn {
             background: none; border: none; font-size: 1.3rem; cursor: pointer;
-            padding: 8px; border-radius: 50%; transition: background 0.2s;
-            display: flex; align-items: center; justify-content: center;
-            width: 40px; height: 40px;
+            padding: 8px; border-radius: 50%; display: flex; align-items: center; 
+            justify-content: center; width: 44px; height: 44px; /* タップしやすく */
         }
-        .icon-btn:hover { background: rgba(0,0,0,0.05); }
-        .icon-btn:disabled { opacity: 0.3; cursor: default; }
+        .icon-btn:active { background: rgba(0,0,0,0.05); }
 
-        /* --- デッキUI --- */
-        .deck-grid { display: grid; gap: 16px; }
-        .deck-card {
-            background: var(--card-bg); padding: 20px; border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); cursor: pointer;
-            position: relative; border: 1px solid rgba(0,0,0,0.05);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .deck-card:active { transform: scale(0.98); }
-        .deck-info { flex-grow: 1; }
-        .deck-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
-        .deck-stats { display: flex; gap: 12px; font-size: 0.85rem; color: var(--text-sub); }
-        .stat-badge { background: #eff6ff; color: var(--primary); padding: 4px 8px; border-radius: 6px; font-weight: 600; }
-        .stat-badge.due { background: #fee2e2; color: var(--danger); }
-
-        /* --- 学習画面 (中央揃え修正) --- */
+        /* --- 学習カード --- */
         .scene { width: 100%; flex-grow: 1; min-height: 350px; perspective: 1000px; cursor: pointer; margin-bottom: 20px; position: relative; }
         .card {
             width: 100%; height: 100%; position: absolute;
-            transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1);
-            transform-style: preserve-3d; border-radius: 20px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d; border-radius: 24px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
         }
         .card.is-flipped { transform: rotateY(180deg); }
         .card__face {
             position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
-            border-radius: 20px; background: var(--card-bg); display: flex;
-            flex-direction: column; justify-content: space-between; /* 上・中・下で分ける */
+            border-radius: 24px; background: var(--card-bg); display: flex;
+            flex-direction: column; justify-content: space-between;
             align-items: center; text-align: center; padding: 40px 24px; box-sizing: border-box;
         }
-        .card__face--back { transform: rotateY(180deg); background: #f8fafc; }
-        
-        /* 内部パーツ */
-        .card-header { height: 30px; width: 100%; position: relative; }
+        .card__face--back { transform: rotateY(180deg); background: #f9fafb; border: 1px solid #f3f4f6; }
+
         .card-body { flex: 1; display: flex; flex-direction: column; justify-content: center; width: 100%; }
-        .card-footer { height: 20px; font-size: 0.85rem; color: #9ca3af; width: 100%; }
+        .q-text { font-size: 1.5rem; font-weight: 800; line-height: 1.4; }
+        .a-text { font-size: 1.75rem; font-weight: 800; color: var(--primary); line-height: 1.4; }
 
-        .card-number {
-            position: absolute; top: -10px; left: -10px; font-size: 0.9rem; font-weight: bold;
-            color: var(--primary); background: #eff6ff; padding: 4px 8px; border-radius: 6px;
-        }
-        
-        .q-label { color: var(--primary); font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
-        .a-label { color: var(--text-sub); font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
-
-        .q-text { font-size: 1.5rem; font-weight: bold; line-height: 1.4; word-break: break-word; }
-        .a-text { font-size: 1.75rem; font-weight: bold; color: var(--primary); line-height: 1.4; word-break: break-word; }
-        .exp-text { font-size: 0.95rem; color: var(--text-sub); line-height: 1.6; margin-top: 16px; overflow-y: auto; max-height: 100px; width: 100%; }
-
-        .controls-container { margin-top: auto; width: 100%; padding-bottom: 10px; }
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
-        .controls.visible { opacity: 1; pointer-events: auto; }
-        .rate-btn {
-            padding: 16px; border: none; border-radius: 12px; color: white; font-weight: 700;
-            font-size: 1rem; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            display: flex; flex-direction: column; align-items: center;
-        }
-        .rate-btn:active { transform: translateY(2px); box-shadow: none; }
-        .btn-again { background: var(--btn-again); }
-        .btn-hard { background: var(--btn-hard); }
-        .btn-good { background: var(--btn-good); }
-        .btn-easy { background: var(--btn-easy); }
-
-        /* --- 設定・管理 (リスト整列修正) --- */
-        .settings-section { background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .settings-section h3 { margin: 0 0 15px 0; font-size: 1rem; color: var(--text-sub); border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        
-        .manager-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+        /* --- 管理リスト --- */
         .manager-item {
-            background: white; padding: 16px; border-radius: 12px; margin-bottom: 10px;
-            display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            background: white; padding: 16px; border-radius: 16px; margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center;
             gap: 12px;
         }
-        .item-text { 
-            font-weight: bold; font-size: 0.95rem; 
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; 
-            flex: 1; /* 残りの幅をすべて使う */
-            text-align: left;
-        }
-        .item-actions {
-            flex-shrink: 0; /* ボタンが潰れないようにする */
-        }
-        
-        .btn-add-float {
-            position: fixed; bottom: 24px; right: 24px; background: var(--primary);
-            color: white; width: 56px; height: 56px; border-radius: 50%;
-            display: flex; justify-content: center; align-items: center; font-size: 30px;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4); cursor: pointer; z-index: 50;
-            line-height: 1; padding-bottom: 4px;
-        }
+        .item-text { font-weight: 600; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        /* --- モーダル・共通 --- */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
-        .modal.active { display: flex; }
-        .modal-content { background: white; padding: 24px; border-radius: 20px; width: 90%; max-width: 400px; }
-        
-        .input-group { margin-bottom: 16px; }
-        .input-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.9rem; color: var(--text-sub); }
-        .input-group input, .input-group textarea {
-            width: 100%; padding: 12px; box-sizing: border-box; border: 2px solid #e5e7eb;
-            border-radius: 10px; font-size: 1rem; font-family: inherit; transition: border-color 0.2s;
-        }
-        .input-group textarea { resize: none; }
-        .input-group input:focus, .input-group textarea:focus { border-color: var(--primary); outline: none; }
-
-        .primary-btn { background: var(--primary); color: white; width: 100%; padding: 14px; border: none; border-radius: 10px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 10px; }
-        .secondary-btn { background: transparent; color: var(--text-sub); width: 100%; padding: 12px; border: none; font-weight: 600; cursor: pointer; margin-top: 5px; }
-        
-        .hidden { display: none !important; }
+        /* --- ローディング --- */
         .loading-overlay { 
-            position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); 
-            display:none; justify-content:center; align-items:center; z-index:999; 
+            position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); 
+            display:none; justify-content:center; align-items:center; z-index:999; backdrop-filter: blur(4px);
         }
-        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -213,24 +160,22 @@
 <div id="auth-view">
     <div class="auth-box">
         <h1>Smart SRS</h1>
-        <p>学習データをクラウドに保存します。<br>ログインしてください。</p>
-        <div id="auth-error" class="error-msg"></div>
+        <p>データを同期して、いつでも<br>どこでも学習を再開できます。</p>
+        <div id="auth-error" class="error-msg" style="color:var(--danger); margin-bottom:1rem; font-size:0.85rem; display:none;"></div>
         
         <div class="input-group">
-            <input type="email" id="email" placeholder="メールアドレス" required>
-        </div>
-        <div class="input-group">
-            <input type="password" id="password" placeholder="パスワード" required>
+            <input type="email" id="email" placeholder="メールアドレス" autocomplete="email">
+            <input type="password" id="password" placeholder="パスワード" autocomplete="current-password">
         </div>
         
-        <button id="btnLogin" class="primary-btn">ログイン</button>
-        <button id="btnSignup" class="secondary-btn">新規登録</button>
+        <button id="btnLogin" class="primary-btn" style="background:var(--primary); color:white; width:100%; padding:16px; border:none; border-radius:14px; font-weight:bold; font-size:1rem; cursor:pointer;">ログイン</button>
+        <button id="btnSignup" class="secondary-btn" style="background:none; color:var(--text-sub); width:100%; padding:12px; border:none; margin-top:10px; font-size:0.9rem; cursor:pointer;">新しいアカウントを作成</button>
     </div>
 </div>
 
 <div class="container" id="deck-list-view">
     <header>
-        <h1>📚 My Decks</h1>
+        <h1>📚 Decks</h1>
         <div class="header-actions">
             <button class="icon-btn" onclick="openSettings()">⚙️</button>
             <button class="icon-btn" onclick="showAddDeckModal()">➕</button>
@@ -242,128 +187,79 @@
 <div class="container" id="settings-view">
     <header>
         <button class="icon-btn" onclick="backToDecks()">←</button>
-        <h1>設定</h1>
-        <div style="width:40px;"></div>
+        <h1>Settings</h1>
+        <div style="width:44px;"></div>
     </header>
-
-    <div class="settings-section">
-        <h3>アカウント</h3>
-        <p id="user-email-display" style="font-size:0.9rem; color:#666; margin-bottom:10px;"></p>
-        <button class="btn-block" onclick="handleLogout()" style="color:var(--danger); border-color:#fecaca;">
-            ログアウト
-        </button>
+    <div class="settings-section" style="background:white; border-radius:20px; padding:20px; margin-bottom:16px;">
+        <h3 style="margin:0 0 10px 0; font-size:0.9rem; color:var(--text-sub);">Account</h3>
+        <p id="user-email-display" style="font-weight:bold; margin-bottom:15px;"></p>
+        <button onclick="handleLogout()" style="width:100%; padding:12px; background:#fee2e2; color:var(--danger); border:none; border-radius:10px; font-weight:bold;">ログアウト</button>
     </div>
-
-    <div class="settings-section">
-        <h3>データ管理</h3>
-        <button class="btn-block" onclick="exportAllData()">📤 JSONバックアップ保存</button>
-        <button class="btn-block" onclick="document.getElementById('restoreInput').click()">📥 JSON復元 (読込)</button>
+    <div class="settings-section" style="background:white; border-radius:20px; padding:20px;">
+        <h3 style="margin:0 0 15px 0; font-size:0.9rem; color:var(--text-sub);">Data Management</h3>
+        <button class="btn-block" style="width:100%; text-align:left; padding:12px 0; background:none; border:none; border-bottom:1px solid #f3f4f6; font-weight:600;" onclick="exportAllData()">📤 JSONバックアップ保存</button>
+        <button class="btn-block" style="width:100%; text-align:left; padding:12px 0; background:none; border:none; font-weight:600;" onclick="document.getElementById('restoreInput').click()">📥 JSONデータ復元</button>
         <input type="file" id="restoreInput" accept=".json" style="display:none;" onchange="restoreData(this)">
-    </div>
-    
-    <div class="settings-section">
-        <h3>デッキ管理</h3>
-        <ul class="settings-deck-list" id="settings-deck-list"></ul>
     </div>
 </div>
 
 <div class="container" id="study-view">
     <header>
         <button class="icon-btn" onclick="backToDecks()">←</button>
-        <h1 id="study-title" style="font-size:1rem;">Deck Title</h1>
+        <h1 id="study-title" style="font-size:1rem; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Deck</h1>
         <div class="header-actions">
-            <button id="btnUndo" class="icon-btn" onclick="handleUndo()" disabled title="1つ戻る">↩️</button>
+            <button id="btnUndo" class="icon-btn" onclick="handleUndo()" disabled>↩️</button>
             <button class="icon-btn" onclick="openManager()">📝</button>
         </div>
     </header>
-
     <div class="scene" id="card-scene">
         <div class="card" id="card-obj">
             <div class="card__face card__face--front">
-                <div class="card-header"><div class="card-number" id="q-num"></div></div>
-                <div class="card-body">
-                    <div class="q-label">QUESTION</div>
-                    <div class="q-text" id="q-text"></div>
-                </div>
-                <div class="card-footer">Tap to Flip</div>
+                <div id="q-num" style="font-size:0.8rem; color:var(--primary); font-weight:bold; background:#eff6ff; padding:4px 10px; border-radius:8px;"></div>
+                <div class="card-body"><div class="q-text" id="q-text"></div></div>
+                <div style="font-size:0.85rem; color:#9ca3af;">Tap to Flip</div>
             </div>
             <div class="card__face card__face--back">
-                <div class="card-header"><div class="card-number" id="a-num"></div></div>
+                <div id="a-num" style="font-size:0.8rem; color:var(--text-sub); font-weight:bold;"></div>
                 <div class="card-body">
-                    <div class="a-label">ANSWER</div>
                     <div class="a-text" id="a-text"></div>
                     <div class="exp-text" id="exp-text"></div>
                 </div>
-                <div class="card-footer"></div>
+                <div></div>
             </div>
         </div>
     </div>
-
-    <div class="empty-state hidden" id="empty-state">
-        <h2 style="margin:0 0 10px 0;">🎉 コンプリート！</h2>
-        <p style="color:var(--text-sub);">今のところ、学習すべきカードはありません。</p>
-        <button class="primary-btn" onclick="startCramMode()" style="margin-top:20px; background:var(--primary-dark);">残りも学習する (先取り)</button>
-        <button class="secondary-btn" onclick="backToDecks()">デッキ一覧に戻る</button>
+    <div class="empty-state hidden" id="empty-state" style="text-align:center; padding:40px 20px;">
+        <h2 style="margin-bottom:10px;">🎉 Complete!</h2>
+        <p style="color:var(--text-sub); margin-bottom:24px;">全ての復習が完了しました。</p>
+        <button class="primary-btn" onclick="startCramMode()" style="width:100%; padding:16px; background:var(--primary); color:white; border:none; border-radius:14px; font-weight:bold;">先取り学習を始める</button>
     </div>
-
-    <div class="controls-container">
-        <div class="controls" id="controls">
-            <button class="rate-btn btn-again" onclick="rateCard(1)">Again <span id="lbl-again">1m</span></button>
-            <button class="rate-btn btn-hard" onclick="rateCard(2)">Hard <span id="lbl-hard">2d</span></button>
-            <button class="rate-btn btn-good" onclick="rateCard(3)">Good <span id="lbl-good">4d</span></button>
-            <button class="rate-btn btn-easy" onclick="rateCard(4)">Easy <span id="lbl-easy">7d</span></button>
-        </div>
-    </div>
+    <div class="controls-container"><div class="controls" id="controls">
+        <button class="rate-btn btn-again" onclick="rateCard(1)">Again<br><span id="lbl-again" style="font-size:0.7rem; font-weight:normal;">1m</span></button>
+        <button class="rate-btn btn-hard" onclick="rateCard(2)">Hard<br><span id="lbl-hard" style="font-size:0.7rem; font-weight:normal;">2d</span></button>
+        <button class="rate-btn btn-good" onclick="rateCard(3)">Good<br><span id="lbl-good" style="font-size:0.7rem; font-weight:normal;">4d</span></button>
+        <button class="rate-btn btn-easy" onclick="rateCard(4)">Easy<br><span id="lbl-easy" style="font-size:0.7rem; font-weight:normal;">7d</span></button>
+    </div></div>
 </div>
 
 <div class="container" id="manager-view">
     <header>
         <button class="icon-btn" onclick="closeManager()">←</button>
-        <h1>カード編集</h1>
+        <h1>Editor</h1>
         <button class="icon-btn" onclick="showDeckMenu()">📥</button>
     </header>
-    <div class="input-group">
-        <input type="text" id="search-input" placeholder="検索..." oninput="renderManagerList()">
-    </div>
-    <ul class="manager-list" id="manager-list"></ul>
+    <input type="text" id="search-input" placeholder="カードを検索..." oninput="renderManagerList()" style="width:100%; padding:14px; border-radius:12px; border:2px solid #e5e7eb; margin-bottom:16px; box-sizing:border-box;">
+    <ul id="manager-list" style="list-style:none; padding:0; margin:0;"></ul>
     <div class="btn-add-float" onclick="openEditModal(null)">+</div>
 </div>
 
-<div id="modal-deck" class="modal">
-    <div class="modal-content">
-        <h3>新規デッキ作成</h3>
-        <div class="input-group"><label>デッキ名</label><input type="text" id="new-deck-name"></div>
-        <button class="primary-btn" onclick="createDeck()">作成</button>
-        <button class="secondary-btn" onclick="closeModals()">キャンセル</button>
-    </div>
-</div>
-
-<div id="modal-card" class="modal">
-    <div class="modal-content">
-        <h3 id="modal-card-title">カード編集</h3>
-        <div class="input-group"><label>番号 (No.)</label><input type="text" id="edit-display-id" placeholder="例: 1, 10-A"></div>
-        <div class="input-group"><label>問題 (Question)</label><textarea id="edit-q" rows="3"></textarea></div>
-        <div class="input-group"><label>答え (Answer)</label><textarea id="edit-a" rows="2"></textarea></div>
-        <div class="input-group"><label>解説 (Explanation)</label><textarea id="edit-e" rows="3"></textarea></div>
-        <button class="primary-btn" onclick="saveCardEdit()">保存</button>
-        <button class="secondary-btn" onclick="deleteCard()" id="btn-delete" style="color:var(--danger);">削除</button>
-        <button class="secondary-btn" onclick="closeModals()">キャンセル</button>
-    </div>
-</div>
-
-<div id="modal-import" class="modal">
-    <div class="modal-content">
-        <h3>ファイル読込 (このデッキへ)</h3>
-        <p style="font-size:0.9rem; color:#666; margin-bottom:10px;">CSV形式: id,question,answer,explanation</p>
-        <input type="file" id="fileInput" accept=".csv,.json">
-        <button class="primary-btn" onclick="handleImport()" style="margin-top:15px;">インポート実行</button>
-        <button class="secondary-btn" onclick="closeModals()">閉じる</button>
-    </div>
-</div>
+<div id="modal-deck" class="modal"><div class="modal-content"><h3>New Deck</h3><input type="text" id="new-deck-name" placeholder="Deck Name" style="width:100%; padding:12px; border-radius:10px; border:2px solid #eee; margin-bottom:15px;"><button class="primary-btn" onclick="createDeck()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:bold;">作成</button><button class="secondary-btn" onclick="closeModals()" style="width:100%; background:none; border:none; margin-top:10px; color:var(--text-sub);">キャンセル</button></div></div>
+<div id="modal-card" class="modal"><div class="modal-content"><h3 id="modal-card-title">Edit Card</h3><div class="input-group"><label>No.</label><input type="text" id="edit-display-id"></div><div class="input-group"><label>Question</label><textarea id="edit-q" rows="3"></textarea></div><div class="input-group"><label>Answer</label><textarea id="edit-a" rows="2"></textarea></div><div class="input-group"><label>Explanation</label><textarea id="edit-e" rows="3"></textarea></div><button class="primary-btn" onclick="saveCardEdit()" style="width:100%; padding:14px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:bold;">保存</button><button class="secondary-btn" onclick="deleteCard()" id="btn-delete" style="color:var(--danger); width:100%; background:none; border:none; margin-top:10px;">削除</button><button class="secondary-btn" onclick="closeModals()" style="width:100%; background:none; border:none; margin-top:5px; color:var(--text-sub);">閉じる</button></div></div>
+<div id="modal-import" class="modal"><div class="modal-content"><h3>Import CSV</h3><p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:15px;">id, question, answer, explanation</p><input type="file" id="fileInput" accept=".csv,.json"><button class="primary-btn" onclick="handleImport()" style="width:100%; padding:12px; background:var(--primary); color:white; border:none; border-radius:10px; margin-top:15px; font-weight:bold;">読み込み実行</button><button class="secondary-btn" onclick="closeModals()" style="width:100%; background:none; border:none; margin-top:10px; color:var(--text-sub);">閉じる</button></div></div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -372,8 +268,7 @@
       projectId: "flipcard-318f3",
       storageBucket: "flipcard-318f3.firebasestorage.app",
       messagingSenderId: "517432601240",
-      appId: "1:517432601240:web:9df881ed3f3c3b3bbb3eed",
-      measurementId: "G-BGE5TKN2QP"
+      appId: "1:517432601240:web:9df881ed3f3c3b3bbb3eed"
     };
 
     const app = initializeApp(firebaseConfig);
@@ -390,7 +285,13 @@
     let sessionReviewedIds = new Set();
     let historyStack = [];
 
-    const STORAGE_KEY = 'smart_srs_v3'; 
+    const STORAGE_KEY = 'smart_srs_v3';
+
+    // 起動時にまずローカルデータを読み込む (ロード時間短縮のため)
+    const localData = localStorage.getItem(STORAGE_KEY);
+    if (localData) {
+        appData = JSON.parse(localData);
+    }
 
     onAuthStateChanged(auth, async (user) => {
         const authView = document.getElementById('auth-view');
@@ -398,101 +299,96 @@
             currentUser = user;
             document.getElementById('user-email-display').innerText = user.email;
             authView.style.display = 'none';
+            
+            // クラウド同期を開始 (ロード画面を出さずに裏でやるか、一瞬だけ出す)
             showLoading(true);
             await loadDataFromCloud();
             showLoading(false);
+            
             switchView('deck-list-view');
             renderDeckList();
         } else {
             currentUser = null;
-            document.querySelectorAll('.container').forEach(el => el.style.display = 'none');
             authView.style.display = 'flex';
+            document.querySelectorAll('.container').forEach(c => c.style.display = 'none');
         }
     });
 
-    document.getElementById('btnLogin').addEventListener('click', async () => {
+    // Login/Signup
+    document.getElementById('btnLogin').onclick = async () => {
         const email = document.getElementById('email').value;
         const pass = document.getElementById('password').value;
-        const err = document.getElementById('auth-error');
-        err.style.display = 'none';
-        try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) {
-            err.innerText = "ログイン失敗: " + e.message;
-            err.style.display = 'block';
-        }
-    });
+        if(!email || !pass) return;
+        showLoading(true);
+        try { await signInWithEmailAndPassword(auth, email, pass); } 
+        catch (e) { document.getElementById('auth-error').innerText = "エラー: " + e.message; document.getElementById('auth-error').style.display = 'block'; }
+        showLoading(false);
+    };
 
-    document.getElementById('btnSignup').addEventListener('click', async () => {
+    document.getElementById('btnSignup').onclick = async () => {
         const email = document.getElementById('email').value;
         const pass = document.getElementById('password').value;
-        const err = document.getElementById('auth-error');
-        err.style.display = 'none';
-        try { await createUserWithEmailAndPassword(auth, email, pass); alert("登録完了！"); } catch (e) {
-            err.innerText = "登録失敗: " + e.message;
-            err.style.display = 'block';
-        }
-    });
+        if(!email || !pass) return;
+        showLoading(true);
+        try { await createUserWithEmailAndPassword(auth, email, pass); alert("登録完了！"); } 
+        catch (e) { document.getElementById('auth-error').innerText = "登録失敗: " + e.message; document.getElementById('auth-error').style.display = 'block'; }
+        showLoading(false);
+    };
 
     window.handleLogout = () => signOut(auth);
 
+    // Data Management
     async function loadDataFromCloud() {
         if (!currentUser) return;
         const userDocRef = doc(db, "users", currentUser.uid);
         try {
             const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) { appData = docSnap.data().appData; } else {
-                const localData = localStorage.getItem(STORAGE_KEY);
-                if (localData) {
-                    if (confirm("以前のローカルデータが見つかりました。クラウドに引き継ぎますか？")) {
-                        appData = JSON.parse(localData); await saveDataToCloud(); 
-                    } else { initDefaultData(); }
-                } else { initDefaultData(); }
+            if (docSnap.exists()) {
+                appData = docSnap.data().appData;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+            } else {
+                // 初回ログインでクラウドにデータがない場合、現在のローカルデータを上げる
+                await saveDataToCloud();
             }
-        } catch (error) { console.error(error); alert("読込失敗"); }
+        } catch (e) { console.error("Sync Error", e); }
     }
 
     async function saveDataToCloud() {
         if (!currentUser) return;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
         const userDocRef = doc(db, "users", currentUser.uid);
-        try { await setDoc(userDocRef, { appData: appData }, { merge: true }); } catch (error) { console.error(error); }
+        try { await setDoc(userDocRef, { appData: appData }, { merge: true }); } catch (e) { console.error(e); }
     }
 
-    function initDefaultData() {
-        appData = { decks: [{ id: 'd1', name: '新規デッキ', cards: [] }] };
-        saveDataToCloud();
-    }
-
+    // --- UI Logic (Global Expose) ---
+    window.switchView = (id) => {
+        document.querySelectorAll('.container').forEach(c => c.style.display = 'none');
+        document.getElementById(id).style.display = 'flex';
+        if(id === 'study-view') updateUndoButton();
+    };
     window.openSettings = () => { switchView('settings-view'); renderSettingsDeckList(); };
-    window.backToDecks = () => { switchView('deck-list-view'); renderDeckList(); sessionReviewedIds.clear(); historyStack = []; };
+    window.backToDecks = () => { switchView('deck-list-view'); renderDeckList(); historyStack = []; };
     window.showAddDeckModal = () => document.getElementById('modal-deck').classList.add('active');
     window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
-    
+
     window.createDeck = () => {
         const name = document.getElementById('new-deck-name').value;
-        if(name) {
-            appData.decks.push({ id:'d_'+Date.now(), name, cards:[] });
-            saveDataToCloud(); renderDeckList(); window.closeModals();
-            document.getElementById('new-deck-name').value = '';
-        }
+        if(!name) return;
+        appData.decks.push({ id: 'd_'+Date.now(), name, cards: [] });
+        saveDataToCloud(); renderDeckList(); closeModals();
+        document.getElementById('new-deck-name').value = '';
     };
 
     window.openStudy = (id) => {
         currentDeckId = id; isCramMode = false; sessionReviewedIds.clear(); historyStack = [];
         const deck = appData.decks.find(d => d.id === id);
-        if(!deck) return;
         document.getElementById('study-title').innerText = deck.name;
         switchView('study-view'); refreshQueue();
     };
 
-    window.openManager = () => { switchView('manager-view'); renderManagerList(); };
-    window.closeManager = () => { switchView('study-view'); refreshQueue(); };
-    window.showDeckMenu = () => document.getElementById('modal-import').classList.add('active');
-    window.startCramMode = () => { isCramMode = true; sessionReviewedIds.clear(); historyStack = []; refreshQueue(); };
-    
     window.rateCard = (rating) => {
         if (!currentCard) return;
-        const cardStateCopy = JSON.parse(JSON.stringify(currentCard));
-        historyStack.push({ card: cardStateCopy, isCramMode: isCramMode });
+        historyStack.push({ card: JSON.parse(JSON.stringify(currentCard)), isCramMode });
         updateUndoButton();
         sessionReviewedIds.add(currentCard.id);
         const deck = appData.decks.find(d => d.id === currentDeckId);
@@ -504,154 +400,30 @@
 
     window.handleUndo = () => {
         if (historyStack.length === 0) return;
-        const prevState = historyStack.pop();
-        const prevCard = prevState.card;
+        const prev = historyStack.pop();
         const deck = appData.decks.find(d => d.id === currentDeckId);
-        const idx = deck.cards.findIndex(c => c.id === prevCard.id);
-        if (idx !== -1) deck.cards[idx] = prevCard;
-        if (prevState.isCramMode) sessionReviewedIds.delete(prevCard.id);
+        const idx = deck.cards.findIndex(c => c.id === prev.card.id);
+        deck.cards[idx] = prev.card;
+        if(prev.isCramMode) sessionReviewedIds.delete(prev.card.id);
         saveDataToCloud(); refreshQueue(); updateUndoButton();
     };
 
-    function updateUndoButton() {
-        const btn = document.getElementById('btnUndo');
-        btn.disabled = (historyStack.length === 0);
-        btn.style.opacity = (historyStack.length === 0) ? '0.3' : '1';
-    }
-
-    window.renderManagerList = renderManagerList;
-
-    window.openEditModal = (cardId) => {
-        editingCardId = cardId;
-        const deck = appData.decks.find(d => d.id === currentDeckId);
-        if (cardId) {
-            const card = deck.cards.find(c => c.id === cardId);
-            document.getElementById('modal-card-title').innerText = "カード編集";
-            document.getElementById('edit-display-id').value = card.displayId || "";
-            document.getElementById('edit-q').value = card.question;
-            document.getElementById('edit-a').value = card.answer;
-            document.getElementById('edit-e').value = card.explanation;
-            document.getElementById('btn-delete').style.display = 'inline-block';
-        } else {
-            document.getElementById('modal-card-title').innerText = "新規カード追加";
-            document.getElementById('edit-display-id').value = "";
-            document.getElementById('edit-q').value = "";
-            document.getElementById('edit-a').value = "";
-            document.getElementById('edit-e').value = "";
-            document.getElementById('btn-delete').style.display = 'none';
-        }
-        document.getElementById('modal-card').classList.add('active');
-    };
-
-    window.saveCardEdit = () => {
-        const deck = appData.decks.find(d => d.id === currentDeckId);
-        const did = document.getElementById('edit-display-id').value;
-        const q = document.getElementById('edit-q').value;
-        const a = document.getElementById('edit-a').value;
-        const e = document.getElementById('edit-e').value;
-        if (!q || !a) return alert("問題と答えは必須です");
-        if (editingCardId) {
-            const idx = deck.cards.findIndex(c => c.id === editingCardId);
-            if (idx > -1) {
-                deck.cards[idx].displayId = did; deck.cards[idx].question = q; deck.cards[idx].answer = a; deck.cards[idx].explanation = e;
-            }
-        } else {
-            deck.cards.push({ id: 'c_' + Date.now(), displayId: did, question: q, answer: a, explanation: e, dueDate: 0, interval: 0, reps: 0, ef: 2.5 });
-        }
-        saveDataToCloud(); window.closeModals(); renderManagerList();
-    };
-
-    window.deleteCard = () => {
-        if (!confirm("削除しますか？")) return;
-        const deck = appData.decks.find(d => d.id === currentDeckId);
-        deck.cards = deck.cards.filter(c => c.id !== editingCardId);
-        saveDataToCloud(); window.closeModals(); renderManagerList();
-    };
-
-    window.handleImport = () => {
-        const file = document.getElementById('fileInput').files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const content = e.target.result;
-            const deck = appData.decks.find(d => d.id === currentDeckId);
-            try {
-                if (file.name.endsWith('.json')) { alert("設定画面の「復元」から行ってください"); return; }
-                const lines = content.trim().split('\n');
-                let added = 0;
-                lines.forEach((l, i) => {
-                    if(i===0 && l.includes('question')) return;
-                    const c = l.split(',');
-                    if(c.length>=2) {
-                        deck.cards.push({
-                            id: 'imp_'+Date.now()+i, displayId: c[0] || "",
-                            question: c[1], answer: c[2], explanation: c[3]||"",
-                            dueDate: 0, interval: 0, reps: 0, ef: 2.5
-                        });
-                        added++;
-                    }
-                });
-                saveDataToCloud(); window.closeModals(); renderManagerList();
-                alert(`${added}件インポート完了`); refreshQueue();
-            } catch(err) { alert("エラー: " + err); }
-        };
-        reader.readAsText(file);
-    };
-
-    window.exportAllData = () => {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
-        const a = document.createElement('a');
-        a.href = dataStr; a.download = "backup_" + new Date().toISOString().slice(0,10) + ".json";
-        a.click();
-    };
-
-    window.restoreData = (input) => {
-        const file = input.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                if (data.decks) {
-                    if (confirm("上書き復元しますか？")) { appData = data; await saveDataToCloud(); alert("復元完了"); renderSettingsDeckList(); }
-                }
-            } catch (err) { alert("読込失敗"); }
-        };
-        reader.readAsText(file); input.value = '';
-    };
-
-    window.renameDeck = (id) => {
-        const deck = appData.decks.find(d => d.id === id);
-        const name = prompt("新しい名前:", deck.name);
-        if(name && name!==deck.name) { deck.name=name; saveDataToCloud(); renderSettingsDeckList(); }
-    };
-
-    window.deleteDeck = (id) => {
-        if(confirm("削除しますか？")) { appData.decks = appData.decks.filter(d => d.id !== id); saveDataToCloud(); renderSettingsDeckList(); }
-    };
-
-    function switchView(viewId) {
-        ['deck-list-view', 'study-view', 'manager-view', 'settings-view'].forEach(id => {
-            document.getElementById(id).style.display = (id === viewId) ? 'flex' : 'none';
-        });
-        if(viewId === 'study-view') updateUndoButton();
-    }
-
+    // --- Rendering ---
     function renderDeckList() {
         const grid = document.getElementById('deck-grid');
         grid.innerHTML = '';
         const now = Date.now();
         appData.decks.forEach(deck => {
-            const dueCount = deck.cards.filter(c => c.dueDate <= now).length;
+            const due = deck.cards.filter(c => c.dueDate <= now).length;
             const el = document.createElement('div');
             el.className = 'deck-card';
-            el.onclick = () => window.openStudy(deck.id);
+            el.onclick = () => openStudy(deck.id);
             el.innerHTML = `
                 <div class="deck-info">
                     <div class="deck-title">${deck.name}</div>
                     <div class="deck-stats">
-                        <span class="stat-badge ${dueCount > 0 ? 'due' : ''}">学習待ち: ${dueCount}</span>
-                        <span class="stat-badge">合計: ${deck.cards.length}</span>
+                        <span class="stat-badge ${due > 0 ? 'due' : ''}">Due: ${due}</span>
+                        <span class="stat-badge" style="background:#f3f4f6; color:#666;">Total: ${deck.cards.length}</span>
                     </div>
                 </div>
             `;
@@ -659,65 +431,19 @@
         });
     }
 
-    function renderSettingsDeckList() {
-        const list = document.getElementById('settings-deck-list');
-        list.innerHTML = '';
-        appData.decks.forEach(deck => {
-            const li = document.createElement('li');
-            li.className = 'settings-deck-item';
-            li.innerHTML = `
-                <div style="font-weight:bold;">${deck.name} (${deck.cards.length})</div>
-                <div style="display:flex; gap:5px;">
-                    <button class="secondary-btn" style="margin:0; padding:5px 10px; font-size:0.8rem;" onclick="renameDeck('${deck.id}')">名前変更</button>
-                    <button class="secondary-btn" style="margin:0; padding:5px 10px; font-size:0.8rem; color:var(--danger);" onclick="deleteDeck('${deck.id}')">削除</button>
-                </div>
-            `;
-            list.appendChild(li);
-        });
-    }
-
-    function renderManagerList() {
-        const list = document.getElementById('manager-list');
-        list.innerHTML = '';
-        const deck = appData.decks.find(d => d.id === currentDeckId);
-        if (!deck) return;
-        const term = document.getElementById('search-input').value.toLowerCase();
-        [...deck.cards].reverse().forEach(card => {
-            if (term && !card.question.toLowerCase().includes(term)) return;
-            const li = document.createElement('li');
-            li.className = 'manager-item';
-            const numLabel = card.displayId ? `[${card.displayId}] ` : "";
-            li.innerHTML = `
-                <div class="item-text">${numLabel}${card.question}</div>
-                <div class="item-actions">
-                    <button class="secondary-btn" style="margin:0; padding:5px 10px;" onclick="openEditModal('${card.id}')">編集</button>
-                </div>
-            `;
-            list.appendChild(li);
-        });
-    }
-
     function refreshQueue() {
         const deck = appData.decks.find(d => d.id === currentDeckId);
-        if (!deck) return;
         const now = Date.now();
         if (isCramMode) {
             studyQueue = deck.cards.filter(c => c.dueDate > now && !sessionReviewedIds.has(c.id)).sort((a,b) => a.dueDate - b.dueDate);
         } else {
             studyQueue = deck.cards.filter(c => c.dueDate <= now).sort((a,b) => a.dueDate - b.dueDate);
         }
+        
         if (studyQueue.length === 0) {
             document.getElementById('card-scene').classList.add('hidden');
             document.getElementById('controls').classList.remove('visible');
             document.getElementById('empty-state').classList.remove('hidden');
-            const hasFuture = deck.cards.some(c => c.dueDate > now);
-            if(isCramMode) {
-                 document.querySelector('#empty-state h2').innerText = "👏 学習完了！";
-                 document.querySelector('#empty-state .primary-btn').style.display = 'none';
-            } else {
-                 document.querySelector('#empty-state h2').innerText = "🎉 コンプリート！";
-                 document.querySelector('#empty-state .primary-btn').style.display = hasFuture ? 'block' : 'none';
-            }
         } else {
             document.getElementById('card-scene').classList.remove('hidden');
             document.getElementById('empty-state').classList.add('hidden');
@@ -731,24 +457,26 @@
         document.getElementById('controls').classList.remove('visible');
         cardObj.classList.remove('is-flipped');
         setTimeout(() => {
-            const numText = currentCard.displayId ? `No. ${currentCard.displayId}` : "";
-            document.getElementById('q-num').innerText = numText;
-            document.getElementById('a-num').innerText = numText;
+            const num = currentCard.displayId ? `No. ${currentCard.displayId}` : "";
+            document.getElementById('q-num').innerText = num;
+            document.getElementById('a-num').innerText = num;
             document.getElementById('q-text').innerText = currentCard.question;
             document.getElementById('a-text').innerText = currentCard.answer;
             document.getElementById('exp-text').innerText = currentCard.explanation || "";
-        }, 200);
+            updateButtonLabels();
+        }, 150);
     }
-    
-    document.getElementById('card-scene').addEventListener('click', () => {
+
+    // Card Flip
+    document.getElementById('card-scene').onclick = () => {
         const cardObj = document.getElementById('card-obj');
-        if (!cardObj.classList.contains('is-flipped') && currentCard) {
+        if (!cardObj.classList.contains('is-flipped')) {
             cardObj.classList.add('is-flipped');
             document.getElementById('controls').classList.add('visible');
-            updateButtonLabels();
         }
-    });
+    };
 
+    // Utils
     function calculateNextState(card, rating) {
         let interval = card.interval, reps = card.reps, ef = card.ef;
         let q = [0, 0, 3, 4, 5][rating];
@@ -759,8 +487,7 @@
             reps++; ef = Math.max(1.3, ef + (0.1 - (5-q)*(0.08+(5-q)*0.02)));
             if (rating === 4) interval = Math.ceil(interval * 1.3);
         }
-        const dueDate = (interval === 0) ? Date.now() + 60000 : Date.now() + (interval * 86400000);
-        return { interval, reps, ef, dueDate };
+        return { interval, reps, ef, dueDate: (interval === 0) ? Date.now() + 60000 : Date.now() + (interval * 86400000) };
     }
 
     function updateButtonLabels() {
@@ -768,12 +495,132 @@
             const res = calculateNextState(currentCard, r);
             const ids = ['lbl-again', 'lbl-hard', 'lbl-good', 'lbl-easy'];
             let txt = res.interval === 0 ? "1m" : res.interval + "d";
-            if (res.interval > 30) txt = Math.round(res.interval/30) + "mo";
             document.getElementById(ids[i]).innerText = txt;
         });
     }
 
+    function updateUndoButton() {
+        const btn = document.getElementById('btnUndo');
+        if(btn) { btn.disabled = (historyStack.length === 0); btn.style.opacity = btn.disabled ? "0.3" : "1"; }
+    }
+
     function showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
+
+    // --- Editor Logic ---
+    window.openManager = () => { switchView('manager-view'); renderManagerList(); };
+    window.closeManager = () => { switchView('study-view'); refreshQueue(); };
+    function renderManagerList() {
+        const list = document.getElementById('manager-list');
+        list.innerHTML = '';
+        const deck = appData.decks.find(d => d.id === currentDeckId);
+        const term = document.getElementById('search-input').value.toLowerCase();
+        [...deck.cards].reverse().forEach(card => {
+            if (term && !card.question.toLowerCase().includes(term)) return;
+            const li = document.createElement('li');
+            li.className = 'manager-item';
+            li.innerHTML = `<div class="item-text">${card.displayId ? '['+card.displayId+'] ' : ''}${card.question}</div><button onclick="openEditModal('${card.id}')" style="background:#f3f4f6; border:none; padding:8px 12px; border-radius:8px; font-weight:bold;">編集</button>`;
+            list.appendChild(li);
+        });
+    }
+
+    window.openEditModal = (id) => {
+        editingCardId = id;
+        const deck = appData.decks.find(d => d.id === currentDeckId);
+        if(id) {
+            const c = deck.cards.find(x => x.id === id);
+            document.getElementById('edit-display-id').value = c.displayId || '';
+            document.getElementById('edit-q').value = c.question;
+            document.getElementById('edit-a').value = c.answer;
+            document.getElementById('edit-e').value = c.explanation;
+            document.getElementById('btn-delete').classList.remove('hidden');
+        } else {
+            document.getElementById('edit-display-id').value = '';
+            document.getElementById('edit-q').value = '';
+            document.getElementById('edit-a').value = '';
+            document.getElementById('edit-e').value = '';
+            document.getElementById('btn-delete').classList.add('hidden');
+        }
+        document.getElementById('modal-card').classList.add('active');
+    };
+
+    window.saveCardEdit = () => {
+        const deck = appData.decks.find(d => d.id === currentDeckId);
+        const card = {
+            displayId: document.getElementById('edit-display-id').value,
+            question: document.getElementById('edit-q').value,
+            answer: document.getElementById('edit-a').value,
+            explanation: document.getElementById('edit-e').value
+        };
+        if(!card.question || !card.answer) return;
+        if(editingCardId) {
+            const idx = deck.cards.findIndex(x => x.id === editingCardId);
+            deck.cards[idx] = { ...deck.cards[idx], ...card };
+        } else {
+            deck.cards.push({ ...card, id: 'c_'+Date.now(), dueDate: 0, interval: 0, reps: 0, ef: 2.5 });
+        }
+        saveDataToCloud(); renderManagerList(); closeModals();
+    };
+
+    window.deleteCard = () => {
+        if(!confirm("削除しますか？")) return;
+        const deck = appData.decks.find(d => d.id === currentDeckId);
+        deck.cards = deck.cards.filter(x => x.id !== editingCardId);
+        saveDataToCloud(); renderManagerList(); closeModals();
+    };
+
+    window.handleImport = () => {
+        const file = document.getElementById('fileInput').files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const deck = appData.decks.find(d => d.id === currentDeckId);
+            const lines = e.target.result.trim().split('\n');
+            lines.forEach((l, i) => {
+                if(i === 0 && l.includes('question')) return;
+                const c = l.split(',');
+                if(c.length >= 2) deck.cards.push({ id:'imp_'+Date.now()+i, displayId:c[0], question:c[1], answer:c[2], explanation:c[3]||'', dueDate:0, interval:0, reps:0, ef:2.5 });
+            });
+            saveDataToCloud(); renderManagerList(); closeModals(); alert("完了"); refreshQueue();
+        };
+        reader.readAsText(file);
+    };
+
+    // Settings Utils
+    function renderSettingsDeckList() {
+        const list = document.getElementById('settings-deck-list');
+        list.innerHTML = '';
+        appData.decks.forEach(deck => {
+            const li = document.createElement('li');
+            li.style = "display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #f3f4f6;";
+            li.innerHTML = `<span style="font-weight:bold;">${deck.name}</span><div><button onclick="renameDeck('${deck.id}')" style="background:none; border:none; color:var(--primary); font-size:0.8rem; margin-right:10px;">名前変更</button><button onclick="deleteDeck('${deck.id}')" style="background:none; border:none; color:var(--danger); font-size:0.8rem;">削除</button></div>`;
+            list.appendChild(li);
+        });
+    }
+    window.renameDeck = (id) => {
+        const deck = appData.decks.find(x => x.id === id);
+        const n = prompt("名前:", deck.name);
+        if(n && n !== deck.name) { deck.name = n; saveDataToCloud(); renderSettingsDeckList(); }
+    };
+    window.deleteDeck = (id) => {
+        if(confirm("削除しますか？")) { appData.decks = appData.decks.filter(x => x.id !== id); saveDataToCloud(); renderSettingsDeckList(); }
+    };
+    window.exportAllData = () => {
+        const blob = new Blob([JSON.stringify(appData)], {type: 'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `srs_backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+    };
+    window.restoreData = (input) => {
+        const file = input.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = JSON.parse(e.target.result);
+            if(data.decks && confirm("上書きしますか？")) { appData = data; await saveDataToCloud(); renderSettingsDeckList(); alert("完了"); }
+        };
+        reader.readAsText(file);
+    };
 </script>
 </body>
 </html>
