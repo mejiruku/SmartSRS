@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SmartSRSDeck</title>
+    <title>SmartSRS</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -38,7 +38,7 @@
             max-width: 600px;
             padding: 16px;
             box-sizing: border-box;
-            display: none; /* デフォルト非表示 (認証後表示) */
+            display: none; 
             flex-direction: column;
             flex: 1;
         }
@@ -50,7 +50,7 @@
             justify-content: center;
             align-items: center;
             width: 100%;
-            height: 100vh;
+            min-height: 100vh;
             padding: 20px;
             box-sizing: border-box;
         }
@@ -62,6 +62,7 @@
             max-width: 400px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
             text-align: center;
+            margin: auto;
         }
         .auth-box h2 { margin-top: 0; color: var(--primary); }
         .error-msg { color: var(--danger); font-size: 0.9rem; margin-bottom: 10px; display: none; }
@@ -86,6 +87,7 @@
             width: 40px; height: 40px;
         }
         .icon-btn:hover { background: rgba(0,0,0,0.05); }
+        .icon-btn:disabled { opacity: 0.3; cursor: default; }
 
         /* --- デッキUI --- */
         .deck-grid { display: grid; gap: 16px; }
@@ -102,8 +104,8 @@
         .stat-badge { background: #eff6ff; color: var(--primary); padding: 4px 8px; border-radius: 6px; font-weight: 600; }
         .stat-badge.due { background: #fee2e2; color: var(--danger); }
 
-        /* --- 学習画面 --- */
-        .scene { width: 100%; flex-grow: 1; min-height: 300px; perspective: 1000px; cursor: pointer; margin-bottom: 20px; position: relative; }
+        /* --- 学習画面 (中央揃え修正) --- */
+        .scene { width: 100%; flex-grow: 1; min-height: 350px; perspective: 1000px; cursor: pointer; margin-bottom: 20px; position: relative; }
         .card {
             width: 100%; height: 100%; position: absolute;
             transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1);
@@ -114,17 +116,27 @@
         .card__face {
             position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
             border-radius: 20px; background: var(--card-bg); display: flex;
-            flex-direction: column; justify-content: center; align-items: center;
-            text-align: center; padding: 24px; box-sizing: border-box;
+            flex-direction: column; justify-content: space-between; /* 上・中・下で分ける */
+            align-items: center; text-align: center; padding: 40px 24px; box-sizing: border-box;
         }
         .card__face--back { transform: rotateY(180deg); background: #f8fafc; }
+        
+        /* 内部パーツ */
+        .card-header { height: 30px; width: 100%; position: relative; }
+        .card-body { flex: 1; display: flex; flex-direction: column; justify-content: center; width: 100%; }
+        .card-footer { height: 20px; font-size: 0.85rem; color: #9ca3af; width: 100%; }
+
         .card-number {
-            position: absolute; top: 20px; left: 20px; font-size: 0.9rem; font-weight: bold;
+            position: absolute; top: -10px; left: -10px; font-size: 0.9rem; font-weight: bold;
             color: var(--primary); background: #eff6ff; padding: 4px 8px; border-radius: 6px;
         }
-        .q-text { font-size: 1.5rem; font-weight: bold; margin-bottom: 16px; line-height: 1.4; }
-        .a-text { font-size: 1.75rem; font-weight: bold; color: var(--primary); margin-bottom: 16px; line-height: 1.4; }
-        .exp-text { font-size: 1rem; color: var(--text-sub); line-height: 1.6; overflow-y: auto; max-height: 40%; width: 100%; }
+        
+        .q-label { color: var(--primary); font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
+        .a-label { color: var(--text-sub); font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
+
+        .q-text { font-size: 1.5rem; font-weight: bold; line-height: 1.4; word-break: break-word; }
+        .a-text { font-size: 1.75rem; font-weight: bold; color: var(--primary); line-height: 1.4; word-break: break-word; }
+        .exp-text { font-size: 0.95rem; color: var(--text-sub); line-height: 1.6; margin-top: 16px; overflow-y: auto; max-height: 100px; width: 100%; }
 
         .controls-container { margin-top: auto; width: 100%; padding-bottom: 10px; }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
@@ -140,24 +152,25 @@
         .btn-good { background: var(--btn-good); }
         .btn-easy { background: var(--btn-easy); }
 
-        /* --- 設定・管理 --- */
+        /* --- 設定・管理 (リスト整列修正) --- */
         .settings-section { background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .settings-section h3 { margin: 0 0 15px 0; font-size: 1rem; color: var(--text-sub); border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .settings-deck-list { list-style: none; padding: 0; margin: 0; }
-        .settings-deck-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
-        
-        .btn-block {
-            width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 10px;
-            border: 1px solid #ddd; background: white; font-weight: bold;
-            cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center;
-        }
         
         .manager-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
         .manager-item {
             background: white; padding: 16px; border-radius: 12px; margin-bottom: 10px;
             display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            gap: 12px;
         }
-        .item-text { font-weight: bold; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60%; }
+        .item-text { 
+            font-weight: bold; font-size: 0.95rem; 
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; 
+            flex: 1; /* 残りの幅をすべて使う */
+            text-align: left;
+        }
+        .item-actions {
+            flex-shrink: 0; /* ボタンが潰れないようにする */
+        }
         
         .btn-add-float {
             position: fixed; bottom: 24px; right: 24px; background: var(--primary);
@@ -258,22 +271,30 @@
     <header>
         <button class="icon-btn" onclick="backToDecks()">←</button>
         <h1 id="study-title" style="font-size:1rem;">Deck Title</h1>
-        <button class="icon-btn" onclick="openManager()">📝</button>
+        <div class="header-actions">
+            <button id="btnUndo" class="icon-btn" onclick="handleUndo()" disabled title="1つ戻る">↩️</button>
+            <button class="icon-btn" onclick="openManager()">📝</button>
+        </div>
     </header>
 
     <div class="scene" id="card-scene">
         <div class="card" id="card-obj">
             <div class="card__face card__face--front">
-                <div class="card-number" id="q-num">No. 1</div>
-                <div style="color:var(--primary); font-size:0.8rem; margin-bottom:12px; font-weight:700; letter-spacing:1px; margin-top:20px;">QUESTION</div>
-                <div class="q-text" id="q-text"></div>
-                <div style="font-size:0.85rem; color:#9ca3af; margin-top:auto;">Tap to Flip</div>
+                <div class="card-header"><div class="card-number" id="q-num"></div></div>
+                <div class="card-body">
+                    <div class="q-label">QUESTION</div>
+                    <div class="q-text" id="q-text"></div>
+                </div>
+                <div class="card-footer">Tap to Flip</div>
             </div>
             <div class="card__face card__face--back">
-                <div class="card-number" id="a-num">No. 1</div>
-                <div style="color:var(--text-sub); font-size:0.8rem; margin-bottom:12px; font-weight:700; letter-spacing:1px; margin-top:20px;">ANSWER</div>
-                <div class="a-text" id="a-text"></div>
-                <div class="exp-text" id="exp-text"></div>
+                <div class="card-header"><div class="card-number" id="a-num"></div></div>
+                <div class="card-body">
+                    <div class="a-label">ANSWER</div>
+                    <div class="a-text" id="a-text"></div>
+                    <div class="exp-text" id="exp-text"></div>
+                </div>
+                <div class="card-footer"></div>
             </div>
         </div>
     </div>
@@ -345,7 +366,6 @@
     import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-    // --- Firebase Configuration ---
     const firebaseConfig = {
       apiKey: "AIzaSyCLJG-ExZC7dVOcSL0Tfzdv965ewCj_uGs",
       authDomain: "flipcard-318f3.firebaseapp.com",
@@ -360,138 +380,90 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // --- State & Globals ---
     let appData = { decks: [] };
     let currentUser = null;
-    
-    // UI State
     let currentDeckId = null;
     let studyQueue = [];
     let currentCard = null;
     let editingCardId = null;
     let isCramMode = false;
     let sessionReviewedIds = new Set();
-    const STORAGE_KEY = 'smart_srs_v3'; // For migration check
+    let historyStack = [];
 
-    // --- Auth Logic ---
+    const STORAGE_KEY = 'smart_srs_v3'; 
+
     onAuthStateChanged(auth, async (user) => {
         const authView = document.getElementById('auth-view');
-        
         if (user) {
             currentUser = user;
             document.getElementById('user-email-display').innerText = user.email;
             authView.style.display = 'none';
-            
-            // データロード開始
             showLoading(true);
             await loadDataFromCloud();
             showLoading(false);
-            
             switchView('deck-list-view');
             renderDeckList();
         } else {
             currentUser = null;
-            // アプリ画面を隠して認証画面を出す
             document.querySelectorAll('.container').forEach(el => el.style.display = 'none');
             authView.style.display = 'flex';
         }
     });
 
-    // Login
     document.getElementById('btnLogin').addEventListener('click', async () => {
         const email = document.getElementById('email').value;
         const pass = document.getElementById('password').value;
         const err = document.getElementById('auth-error');
         err.style.display = 'none';
-        
-        try {
-            await signInWithEmailAndPassword(auth, email, pass);
-        } catch (e) {
+        try { await signInWithEmailAndPassword(auth, email, pass); } catch (e) {
             err.innerText = "ログイン失敗: " + e.message;
             err.style.display = 'block';
         }
     });
 
-    // Signup
     document.getElementById('btnSignup').addEventListener('click', async () => {
         const email = document.getElementById('email').value;
         const pass = document.getElementById('password').value;
         const err = document.getElementById('auth-error');
         err.style.display = 'none';
-
-        try {
-            await createUserWithEmailAndPassword(auth, email, pass);
-            alert("登録完了！");
-        } catch (e) {
+        try { await createUserWithEmailAndPassword(auth, email, pass); alert("登録完了！"); } catch (e) {
             err.innerText = "登録失敗: " + e.message;
             err.style.display = 'block';
         }
     });
 
-    // Logout
-    window.handleLogout = () => {
-        signOut(auth);
-    };
+    window.handleLogout = () => signOut(auth);
 
-    // --- Data Persistence (Firestore) ---
     async function loadDataFromCloud() {
         if (!currentUser) return;
         const userDocRef = doc(db, "users", currentUser.uid);
-        
         try {
             const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) {
-                appData = docSnap.data().appData;
-            } else {
-                // 初回ログイン時: ローカルストレージにデータがあれば移行する
+            if (docSnap.exists()) { appData = docSnap.data().appData; } else {
                 const localData = localStorage.getItem(STORAGE_KEY);
                 if (localData) {
                     if (confirm("以前のローカルデータが見つかりました。クラウドに引き継ぎますか？")) {
-                        appData = JSON.parse(localData);
-                        await saveDataToCloud(); // 即保存
-                    } else {
-                        initDefaultData();
-                    }
-                } else {
-                    initDefaultData();
-                }
+                        appData = JSON.parse(localData); await saveDataToCloud(); 
+                    } else { initDefaultData(); }
+                } else { initDefaultData(); }
             }
-        } catch (error) {
-            console.error("Error loading data:", error);
-            alert("データの読み込みに失敗しました。");
-        }
+        } catch (error) { console.error(error); alert("読込失敗"); }
     }
 
     async function saveDataToCloud() {
         if (!currentUser) return;
-        // ローカルストレージにも一応残すが、主はクラウド
         localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-        
-        // Firestore保存 (非同期でバックグラウンド実行)
         const userDocRef = doc(db, "users", currentUser.uid);
-        try {
-            await setDoc(userDocRef, { appData: appData }, { merge: true });
-        } catch (error) {
-            console.error("Cloud save failed:", error);
-        }
+        try { await setDoc(userDocRef, { appData: appData }, { merge: true }); } catch (error) { console.error(error); }
     }
 
     function initDefaultData() {
-        appData = {
-            decks: [{ 
-                id: 'd1', name: '英単語 (Basic)', 
-                cards: [
-                    { id: 'c1', displayId: '1', question: 'Apple', answer: 'りんご', explanation: '', dueDate: 0, interval: 0, reps: 0, ef: 2.5 }
-                ]
-            }]
-        };
+        appData = { decks: [{ id: 'd1', name: '新規デッキ', cards: [] }] };
         saveDataToCloud();
     }
 
-    // --- Global Expose for HTML OnClick ---
-    // Module type script creates its own scope. We need to attach functions to window.
     window.openSettings = () => { switchView('settings-view'); renderSettingsDeckList(); };
-    window.backToDecks = () => { switchView('deck-list-view'); renderDeckList(); sessionReviewedIds.clear(); };
+    window.backToDecks = () => { switchView('deck-list-view'); renderDeckList(); sessionReviewedIds.clear(); historyStack = []; };
     window.showAddDeckModal = () => document.getElementById('modal-deck').classList.add('active');
     window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
     
@@ -499,40 +471,55 @@
         const name = document.getElementById('new-deck-name').value;
         if(name) {
             appData.decks.push({ id:'d_'+Date.now(), name, cards:[] });
-            saveDataToCloud();
-            renderDeckList();
-            window.closeModals();
+            saveDataToCloud(); renderDeckList(); window.closeModals();
             document.getElementById('new-deck-name').value = '';
         }
     };
 
     window.openStudy = (id) => {
-        currentDeckId = id; isCramMode = false; sessionReviewedIds.clear();
+        currentDeckId = id; isCramMode = false; sessionReviewedIds.clear(); historyStack = [];
         const deck = appData.decks.find(d => d.id === id);
         if(!deck) return;
         document.getElementById('study-title').innerText = deck.name;
-        switchView('study-view');
-        refreshQueue();
+        switchView('study-view'); refreshQueue();
     };
 
     window.openManager = () => { switchView('manager-view'); renderManagerList(); };
     window.closeManager = () => { switchView('study-view'); refreshQueue(); };
     window.showDeckMenu = () => document.getElementById('modal-import').classList.add('active');
-    
-    window.startCramMode = () => { isCramMode = true; sessionReviewedIds.clear(); refreshQueue(); };
+    window.startCramMode = () => { isCramMode = true; sessionReviewedIds.clear(); historyStack = []; refreshQueue(); };
     
     window.rateCard = (rating) => {
         if (!currentCard) return;
+        const cardStateCopy = JSON.parse(JSON.stringify(currentCard));
+        historyStack.push({ card: cardStateCopy, isCramMode: isCramMode });
+        updateUndoButton();
         sessionReviewedIds.add(currentCard.id);
         const deck = appData.decks.find(d => d.id === currentDeckId);
         const idx = deck.cards.findIndex(c => c.id === currentCard.id);
         const next = calculateNextState(currentCard, rating);
         deck.cards[idx] = { ...currentCard, ...next };
-        saveDataToCloud();
-        refreshQueue();
+        saveDataToCloud(); refreshQueue();
     };
 
-    window.renderManagerList = renderManagerList; // Search input calls this
+    window.handleUndo = () => {
+        if (historyStack.length === 0) return;
+        const prevState = historyStack.pop();
+        const prevCard = prevState.card;
+        const deck = appData.decks.find(d => d.id === currentDeckId);
+        const idx = deck.cards.findIndex(c => c.id === prevCard.id);
+        if (idx !== -1) deck.cards[idx] = prevCard;
+        if (prevState.isCramMode) sessionReviewedIds.delete(prevCard.id);
+        saveDataToCloud(); refreshQueue(); updateUndoButton();
+    };
+
+    function updateUndoButton() {
+        const btn = document.getElementById('btnUndo');
+        btn.disabled = (historyStack.length === 0);
+        btn.style.opacity = (historyStack.length === 0) ? '0.3' : '1';
+    }
+
+    window.renderManagerList = renderManagerList;
 
     window.openEditModal = (cardId) => {
         editingCardId = cardId;
@@ -563,7 +550,6 @@
         const a = document.getElementById('edit-a').value;
         const e = document.getElementById('edit-e').value;
         if (!q || !a) return alert("問題と答えは必須です");
-
         if (editingCardId) {
             const idx = deck.cards.findIndex(c => c.id === editingCardId);
             if (idx > -1) {
@@ -572,18 +558,14 @@
         } else {
             deck.cards.push({ id: 'c_' + Date.now(), displayId: did, question: q, answer: a, explanation: e, dueDate: 0, interval: 0, reps: 0, ef: 2.5 });
         }
-        saveDataToCloud();
-        window.closeModals();
-        renderManagerList();
+        saveDataToCloud(); window.closeModals(); renderManagerList();
     };
 
     window.deleteCard = () => {
         if (!confirm("削除しますか？")) return;
         const deck = appData.decks.find(d => d.id === currentDeckId);
         deck.cards = deck.cards.filter(c => c.id !== editingCardId);
-        saveDataToCloud();
-        window.closeModals();
-        renderManagerList();
+        saveDataToCloud(); window.closeModals(); renderManagerList();
     };
 
     window.handleImport = () => {
@@ -593,16 +575,8 @@
         reader.onload = (e) => {
             const content = e.target.result;
             const deck = appData.decks.find(d => d.id === currentDeckId);
-            
             try {
-                // Try JSON first
-                if (file.name.endsWith('.json')) {
-                    const jsonData = JSON.parse(content);
-                    // Single deck import logic could go here, but stick to CSV for now or full restore
-                    alert("現在JSONインポートは設定画面の「復元」から行ってください");
-                    return;
-                }
-                // CSV
+                if (file.name.endsWith('.json')) { alert("設定画面の「復元」から行ってください"); return; }
                 const lines = content.trim().split('\n');
                 let added = 0;
                 lines.forEach((l, i) => {
@@ -610,19 +584,15 @@
                     const c = l.split(',');
                     if(c.length>=2) {
                         deck.cards.push({
-                            id: 'imp_'+Date.now()+i,
-                            displayId: c[0] || "",
+                            id: 'imp_'+Date.now()+i, displayId: c[0] || "",
                             question: c[1], answer: c[2], explanation: c[3]||"",
                             dueDate: 0, interval: 0, reps: 0, ef: 2.5
                         });
                         added++;
                     }
                 });
-                saveDataToCloud();
-                window.closeModals();
-                renderManagerList();
-                alert(`${added}件インポート完了`);
-                refreshQueue();
+                saveDataToCloud(); window.closeModals(); renderManagerList();
+                alert(`${added}件インポート完了`); refreshQueue();
             } catch(err) { alert("エラー: " + err); }
         };
         reader.readAsText(file);
@@ -631,8 +601,7 @@
     window.exportAllData = () => {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
         const a = document.createElement('a');
-        a.href = dataStr;
-        a.download = "backup_" + new Date().toISOString().slice(0,10) + ".json";
+        a.href = dataStr; a.download = "backup_" + new Date().toISOString().slice(0,10) + ".json";
         a.click();
     };
 
@@ -644,17 +613,11 @@
             try {
                 const data = JSON.parse(e.target.result);
                 if (data.decks) {
-                    if (confirm("現在のデータを上書きして復元しますか？")) {
-                        appData = data;
-                        await saveDataToCloud();
-                        alert("復元完了しました");
-                        renderSettingsDeckList(); // Refresh list
-                    }
+                    if (confirm("上書き復元しますか？")) { appData = data; await saveDataToCloud(); alert("復元完了"); renderSettingsDeckList(); }
                 }
             } catch (err) { alert("読込失敗"); }
         };
-        reader.readAsText(file);
-        input.value = '';
+        reader.readAsText(file); input.value = '';
     };
 
     window.renameDeck = (id) => {
@@ -664,18 +627,14 @@
     };
 
     window.deleteDeck = (id) => {
-        if(confirm("削除しますか？")) {
-            appData.decks = appData.decks.filter(d => d.id !== id);
-            saveDataToCloud();
-            renderSettingsDeckList();
-        }
+        if(confirm("削除しますか？")) { appData.decks = appData.decks.filter(d => d.id !== id); saveDataToCloud(); renderSettingsDeckList(); }
     };
 
-    // --- Helper Functions ---
     function switchView(viewId) {
         ['deck-list-view', 'study-view', 'manager-view', 'settings-view'].forEach(id => {
             document.getElementById(id).style.display = (id === viewId) ? 'flex' : 'none';
         });
+        if(viewId === 'study-view') updateUndoButton();
     }
 
     function renderDeckList() {
@@ -728,7 +687,12 @@
             const li = document.createElement('li');
             li.className = 'manager-item';
             const numLabel = card.displayId ? `[${card.displayId}] ` : "";
-            li.innerHTML = `<div class="item-text">${numLabel}${card.question}</div><button class="secondary-btn" style="margin:0; padding:5px 10px;" onclick="openEditModal('${card.id}')">編集</button>`;
+            li.innerHTML = `
+                <div class="item-text">${numLabel}${card.question}</div>
+                <div class="item-actions">
+                    <button class="secondary-btn" style="margin:0; padding:5px 10px;" onclick="openEditModal('${card.id}')">編集</button>
+                </div>
+            `;
             list.appendChild(li);
         });
     }
@@ -742,12 +706,10 @@
         } else {
             studyQueue = deck.cards.filter(c => c.dueDate <= now).sort((a,b) => a.dueDate - b.dueDate);
         }
-        
         if (studyQueue.length === 0) {
             document.getElementById('card-scene').classList.add('hidden');
             document.getElementById('controls').classList.remove('visible');
             document.getElementById('empty-state').classList.remove('hidden');
-            // Check future cards
             const hasFuture = deck.cards.some(c => c.dueDate > now);
             if(isCramMode) {
                  document.querySelector('#empty-state h2').innerText = "👏 学習完了！";
@@ -768,7 +730,6 @@
         const cardObj = document.getElementById('card-obj');
         document.getElementById('controls').classList.remove('visible');
         cardObj.classList.remove('is-flipped');
-        
         setTimeout(() => {
             const numText = currentCard.displayId ? `No. ${currentCard.displayId}` : "";
             document.getElementById('q-num').innerText = numText;
@@ -779,7 +740,6 @@
         }, 200);
     }
     
-    // Card Flip
     document.getElementById('card-scene').addEventListener('click', () => {
         const cardObj = document.getElementById('card-obj');
         if (!cardObj.classList.contains('is-flipped') && currentCard) {
@@ -789,7 +749,6 @@
         }
     });
 
-    // SRS Algo
     function calculateNextState(card, rating) {
         let interval = card.interval, reps = card.reps, ef = card.ef;
         let q = [0, 0, 3, 4, 5][rating];
