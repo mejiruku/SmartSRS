@@ -12,6 +12,10 @@ let isCramMode = false;
 let sessionReviewedIds = new Set();
 let historyStack = [];
 
+// --- 学習記録用の変数 ---
+let sessionStartTime = null; 
+let sessionCardsCount = 0;   
+
 const STORAGE_KEY = 'smart_srs_v3'; 
 
 onAuthStateChanged(auth, async (user) => {
@@ -41,7 +45,6 @@ function startBypassTimer() {
         console.log("Bypassing login...");
         currentUser = { uid: 'test_user_' + Date.now(), isAnonymous: true, email: 'test@test.com' };
         alert("テストモードでログインしました (Bypass)");
-        // Replicate onAuthStateChanged flow
         document.getElementById('user-email-display').innerText = 'Test User';
         document.getElementById('auth-view').style.display = 'none';
         initDefaultData();
@@ -61,9 +64,6 @@ btnLogin.addEventListener('mouseleave', cancelBypassTimer);
 btnLogin.addEventListener('touchend', cancelBypassTimer);
 
 btnLogin.addEventListener('click', async () => {
-    // If bypass happened, currentUser might be set? 
-    // But usually click fires after mouseup. If timer triggered, view changed?
-    // If view changed, this click might not matter or might target hidden element.
     if (!currentUser) await tryLogin(); 
 });
 
@@ -113,22 +113,17 @@ async function loadDataFromCloud() {
         const snp = await getDocs(decksCol);
         if (!snp.empty) {
             appData.decks = snp.docs.map(d => d.data());
-            // Sort by order if available
             appData.decks.sort((a, b) => (a.order || 0) - (b.order || 0));
-            // Assign order if missing
             let changed = false;
             appData.decks.forEach((d, i) => {
                 if (d.order === undefined) { d.order = i; changed = true; }
             });
             if (changed) { appData.decks.forEach(d => saveDeckToCloud(d)); }
         } else {
-            // Legacy check
             const userDocRef = doc(db, "users", currentUser.uid);
             const docSnap = await getDoc(userDocRef);
             if (docSnap.exists() && docSnap.data().appData) {
                 appData = docSnap.data().appData;
-                // Migrate
-                // Add order
                 appData.decks.forEach((d, i) => d.order = i);
                 for (const deck of appData.decks) {
                     await saveDeckToCloud(deck);
@@ -161,14 +156,26 @@ function initDefaultData() {
 window.openSettings = () => { 
     switchView('settings-view'); 
     renderSettingsDeckList(); 
-    
-    // Display App Version
     const meta = document.querySelector('meta[name="data-app-version"]');
     if (meta) {
         document.getElementById('app-version').innerText = meta.content;
     }
 };
-window.backToDecks = () => { switchView('deck-list-view'); renderDeckList(); sessionReviewedIds.clear(); historyStack = []; };
+
+// --- 学習終了時に記録を保存するように変更 ---
+window.backToDecks = async () => { 
+    if (sessionStartTime && sessionCardsCount > 0) {
+        const duration = Math.floor((Date.now() - sessionStartTime) / 1000); 
+        await saveStudyLog(sessionCardsCount, duration);
+    }
+    sessionStartTime = null;
+    sessionCardsCount = 0;
+    switchView('deck-list-view'); 
+    renderDeckList(); 
+    sessionReviewedIds.clear(); 
+    historyStack = []; 
+};
+
 window.showAddDeckModal = () => document.getElementById('modal-deck').classList.add('active');
 window.closeModals = () => document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
 
@@ -183,14 +190,16 @@ window.createDeck = () => {
     }
 };
 
+// --- 学習開始時にセッション計測を開始 ---
 window.openStudy = (id) => {
     currentDeckId = id; isCramMode = false; sessionReviewedIds.clear(); historyStack = [];
+    sessionStartTime = Date.now(); 
+    sessionCardsCount = 0;         
     const deck = appData.decks.find(d => d.id === id);
     if(!deck) return;
     document.getElementById('study-title').innerText = deck.name;
-    // Total cards for progress calculation
     window.sessionTotal = deck.cards.filter(c => c.dueDate <= Date.now()).length; 
-    if(window.sessionTotal === 0 && deck.cards.length > 0) window.sessionTotal = deck.cards.length; // If cram mode or all done, just use total? Adjusted in refreshQueue
+    if(window.sessionTotal === 0 && deck.cards.length > 0) window.sessionTotal = deck.cards.length; 
     switchView('study-view'); refreshQueue();
 };
 
@@ -204,9 +213,10 @@ window.startCramMode = () => {
     refreshQueue(); 
 };
 
+// --- カード回答時にカウントアップ ---
 window.rateCard = (rating) => {
     if (!currentCard) return;
-    // Disable buttons to prevent double submission
+    sessionCardsCount++; 
     document.querySelectorAll('.rate-btn').forEach(btn => btn.disabled = true);
     
     const cardStateCopy = JSON.parse(JSON.stringify(currentCard));
@@ -228,8 +238,7 @@ window.handleUndo = () => {
     const idx = deck.cards.findIndex(c => c.id === prevCard.id);
     if (idx !== -1) deck.cards[idx] = prevCard;
     if (prevState.isCramMode) sessionReviewedIds.delete(prevCard.id);
-    if (idx !== -1) deck.cards[idx] = prevCard;
-    if (prevState.isCramMode) sessionReviewedIds.delete(prevCard.id);
+    if (sessionCardsCount > 0) sessionCardsCount--; 
     saveDeckToCloud(deck); refreshQueue(); updateUndoButton();
 };
 
@@ -244,11 +253,7 @@ window.renderManagerList = renderManagerList;
 window.openEditModal = (cardId) => {
     editingCardId = cardId;
     const deck = appData.decks.find(d => d.id === currentDeckId); 
-    
-    if (!deck) {
-        console.error("デッキが見つかりません");
-        return;
-    }
+    if (!deck) return;
     
     if (cardId) {
         const card = deck.cards.find(c => c.id === cardId);
@@ -304,11 +309,8 @@ window.handleImport = () => {
         try {
             if (file.name.endsWith('.json')) { alert("設定画面の「復元」から行ってください"); return; }
             const lines = content.trim().split('\n');
-            
-            // Auto-detect delimiter
             const firstLine = lines.find(l => l.trim().length > 0) || lines[0];
             const delimiter = firstLine && firstLine.includes('\t') ? '\t' : ',';
-
             let added = 0;
             lines.forEach((l, i) => {
                 const c = l.split(delimiter);
@@ -344,10 +346,8 @@ window.restoreData = (input) => {
             const data = JSON.parse(e.target.result);
             if (data.decks) {
                 if (confirm("上書き復元しますか？現在のデータは消去され、バックアップデータで上書きされます。")) {
-                    // Delete all existing decks first
                     for(const d of appData.decks) { await deleteDeckFromCloud(d.id); }
                     appData = data; 
-                    // Save all restored decks
                     for(const d of appData.decks) { await saveDeckToCloud(d); }
                     alert("復元完了"); renderSettingsDeckList(); 
                 }
@@ -372,16 +372,15 @@ window.deleteDeck = (id) => {
 };
 
 function switchView(viewId) {
-    ['deck-list-view', 'study-view', 'manager-view', 'settings-view'].forEach(id => {
-        document.getElementById(id).style.display = (id === viewId) ? 'flex' : 'none';
+    ['deck-list-view', 'study-view', 'manager-view', 'settings-view', 'stats-view'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (id === viewId) ? 'flex' : 'none';
     });
     if(viewId === 'study-view') updateUndoButton();
 }
 
 function renderDeckList() {
-    // Ensure sorted
     appData.decks.sort((a,b) => (a.order||0) - (b.order||0));
-    
     const grid = document.getElementById('deck-grid');
     grid.innerHTML = '';
     const now = Date.now();
@@ -402,7 +401,6 @@ function renderDeckList() {
         grid.appendChild(el);
     });
 
-    // Calculate next study time across all decks
     let earliestDue = Infinity;
     let totalDue = 0;
     appData.decks.forEach(deck => {
@@ -428,16 +426,13 @@ function renderDeckList() {
         else if (diffMin < 60) relativeText = diffMin + '分後';
         else if (diffHour < 24) relativeText = diffHour + '時間後';
         else relativeText = diffDay + '日後';
-
         const timeStr = (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
         infoEl.innerText = timeStr + '（' + relativeText + '）';
     }
 }
 
 function renderSettingsDeckList() {
-    // Ensure sorted
     appData.decks.sort((a,b) => (a.order||0) - (b.order||0));
-
     const list = document.getElementById('settings-deck-list');
     list.innerHTML = '';
     if (appData.decks.length === 0) {
@@ -447,7 +442,6 @@ function renderSettingsDeckList() {
     appData.decks.forEach((deck, index) => {
         const isFirst = index === 0;
         const isLast = index === appData.decks.length - 1;
-        
         const li = document.createElement('li');
         li.innerHTML = `
             <div class="deck-name-row">
@@ -471,23 +465,14 @@ window.moveDeck = async (id, dir) => {
     if (idx === -1) return;
     const targetIdx = idx + dir;
     if (targetIdx < 0 || targetIdx >= appData.decks.length) return;
-    
-    // Swap
     const current = appData.decks[idx];
     const target = appData.decks[targetIdx];
-    
-    // Swap orders. If order is same (shouldn't happen but safe), ensure distinct
     const tempOrder = current.order;
     current.order = target.order;
     target.order = tempOrder;
-    
-    // Local swap for immediate UI update
     appData.decks[idx] = target;
     appData.decks[targetIdx] = current;
-    
     renderSettingsDeckList();
-    
-    // Save both
     await Promise.all([saveDeckToCloud(current), saveDeckToCloud(target)]);
 };
 
@@ -497,11 +482,8 @@ function renderManagerList() {
     const deck = appData.decks.find(d => d.id === currentDeckId);
     if (!deck) return;
     const term = document.getElementById('search-input').value.toLowerCase();
-    
-    // Show/Hide bulk delete button
     const btnBulk = document.getElementById('btn-bulk-delete');
-    btnBulk.style.display = 'none'; // hidden initially or when list rerenders
-    
+    btnBulk.style.display = 'none'; 
     [...deck.cards].reverse().forEach(card => {
         if (term && !card.question.toLowerCase().includes(term)) return;
         const li = document.createElement('li');
@@ -527,7 +509,6 @@ window.deleteSelectedCards = () => {
     const checked = document.querySelectorAll('.card-chk:checked');
     if(checked.length === 0) return;
     if(!confirm(`${checked.length}枚のカードを削除しますか？`)) return;
-    
     const ids = Array.from(checked).map(c => c.value);
     const deck = appData.decks.find(d => d.id === currentDeckId);
     deck.cards = deck.cards.filter(c => !ids.includes(c.id));
@@ -543,14 +524,8 @@ function refreshQueue() {
     } else {
         studyQueue = deck.cards.filter(c => c.dueDate <= now).sort((a,b) => a.dueDate - b.dueDate);
     }
-
-    // Update Progress Bar
     const total = window.sessionTotal || 1; 
     const studied = sessionReviewedIds.size;
-    // For standard mode, sessionTotal is typically fixed at start. 
-    // If we want simple progress: reviewed / (reviewed + remaining in queue)
-    // But queue length changes. Let's use sessionReviewedIds.size vs initial count.
-    // Simplified approach: progress = reviewed / (reviewed + queue.length)
     const currentTotal = studied + studyQueue.length;
     const pct = currentTotal > 0 ? (studied / currentTotal) * 100 : 100;
     document.getElementById('study-progress').style.width = pct + '%';
@@ -577,9 +552,7 @@ function refreshQueue() {
 
 function renderCard() {
     const cardObj = document.getElementById('card-obj');
-    // Re-enable buttons
     document.querySelectorAll('.rate-btn').forEach(btn => btn.disabled = false);
-    
     document.getElementById('controls').classList.remove('visible');
     cardObj.classList.remove('is-flipped');
     setTimeout(() => {
@@ -595,7 +568,6 @@ function renderCard() {
 document.getElementById('card-scene').addEventListener('click', () => {
     const cardObj = document.getElementById('card-obj');
     if (!currentCard) return;
-
     const controls = document.getElementById('controls');
     if (!controls.classList.contains('visible')) {
         controls.classList.add('visible');
@@ -607,88 +579,44 @@ document.getElementById('card-scene').addEventListener('click', () => {
 function calculateNextState(card, rating) {
     let { interval, reps, ef } = card;
     let nextInterval, nextReps, nextEf;
-
-    // 1. EF（難易度係数）の更新
-    // Again: -0.2, Hard: -0.15, Good: 変化なし, Easy: +0.15
-    // 最低値: 1.3
     let drift = 0;
     if (rating === 1) drift = -0.2;
     else if (rating === 2) drift = -0.15;
     else if (rating === 4) drift = 0.15;
-    
     nextEf = Math.max(1.3, ef + drift);
-
-    // 2. フェーズ判定: ルーキー (reps === 0) / レビュー (reps >= 1)
     const isRookie = reps === 0;
-
     if (rating === 1) {
-        // --- AGAIN: repsを0にリセット → ルーキーに戻す ---
         nextReps = 0;
-        nextInterval = 0; // dueDate計算で10分後に設定
-    }
-    else if (isRookie) {
-        // --- ルーキーフェーズ: 固定ステップで卒業 ---
-        if (rating === 2) {       // Hard → 1日後
-            nextInterval = 1;
-            nextReps = 1;
-        } else if (rating === 3) { // Good → 2日後
-            nextInterval = 2;
-            nextReps = 1;
-        } else if (rating === 4) { // Easy → 4日後
-            nextInterval = 4;
-            nextReps = 1;
-        }
-    }
-    else {
-        // --- レビューフェーズ: EFベースの乗算 ---
-        const base = Math.max(interval, 1); // 最低1日をベースにする
-
-        if (rating === 2) {        // Hard: 前回と同じ or 1.2倍
-            nextInterval = base * 1.2;
-        } else if (rating === 3) { // Good: EFをフル適用
-            nextInterval = base * nextEf;
-        } else if (rating === 4) { // Easy: EF × 1.3ボーナス
-            nextInterval = base * nextEf * 1.3;
-        }
-
-        // ガードレール: Good は最低でも Hard + 1日
+        nextInterval = 0; 
+    } else if (isRookie) {
+        if (rating === 2) { nextInterval = 1; nextReps = 1; }
+        else if (rating === 3) { nextInterval = 2; nextReps = 1; }
+        else if (rating === 4) { nextInterval = 4; nextReps = 1; }
+    } else {
+        const base = Math.max(interval, 1);
+        if (rating === 2) { nextInterval = base * 1.2; }
+        else if (rating === 3) { nextInterval = base * nextEf; }
+        else if (rating === 4) { nextInterval = base * nextEf * 1.3; }
         if (rating === 3) {
             const hardInterval = base * 1.2;
-            if (nextInterval <= hardInterval) {
-                nextInterval = hardInterval + 1;
-            }
+            if (nextInterval <= hardInterval) nextInterval = hardInterval + 1;
         }
         if (rating === 4) {
-            // Easy は Good 以上を保証（Goodの計算を再現）
             let goodInterval = base * nextEf;
             const hardInterval = base * 1.2;
-            if (goodInterval <= hardInterval) {
-                goodInterval = hardInterval + 1;
-            }
-            if (nextInterval <= goodInterval) {
-                nextInterval = goodInterval + 1;
-            }
+            if (goodInterval <= hardInterval) goodInterval = hardInterval + 1;
+            if (nextInterval <= goodInterval) nextInterval = goodInterval + 1;
         }
-
         nextReps = reps + 1;
     }
-
-    // 3. Fuzz（ランダム散布）: 3日超の間隔に ±5% のゆらぎ
     if (nextInterval > 3) {
-        const fuzz = 0.95 + Math.random() * 0.1; // 0.95 ~ 1.05
+        const fuzz = 0.95 + Math.random() * 0.1;
         nextInterval = nextInterval * fuzz;
     }
-
-    // 4. dueDate の計算
     const now = Date.now();
     let dueDate;
-    
-    if (nextInterval === 0) {
-        dueDate = now + 10 * 60 * 1000; // 10分後
-    } else {
-        dueDate = now + (nextInterval * 24 * 60 * 60 * 1000);
-    }
-
+    if (nextInterval === 0) { dueDate = now + 10 * 60 * 1000; }
+    else { dueDate = now + (nextInterval * 24 * 60 * 60 * 1000); }
     return { interval: nextInterval, reps: nextReps, ef: nextEf, dueDate };
 }
 
@@ -699,7 +627,7 @@ function updateButtonLabels() {
         const ids = ['lbl-again', 'lbl-hard', 'lbl-good', 'lbl-easy'];
         let txt;
         if (res.interval === 0) txt = "10m";
-        else if (res.interval < 1) { // e.g. 10m or 12h
+        else if (res.interval < 1) {
             const mins = Math.round(res.interval * 1440);
             if (mins < 60) txt = mins + "m";
             else txt = Math.round(mins/60) + "h";
@@ -714,46 +642,118 @@ function updateButtonLabels() {
     });
 }
 
-// --- Keyboard Shortcuts ---
+// --- 統計保存ロジック ---
+async function saveStudyLog(count, seconds) {
+    if (!currentUser) return;
+    const today = new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replaceAll('/', '-');
+    const logRef = doc(db, "users", currentUser.uid, "logs", today);
+    const snap = await getDoc(logRef);
+    if (snap.exists()) {
+        const data = snap.data();
+        await setDoc(logRef, { count: (data.count || 0) + count, seconds: (data.seconds || 0) + seconds });
+    } else {
+        await setDoc(logRef, { count, seconds });
+    }
+}
+
+// --- 統計表示ロジック（修正版） ---
+window.openStats = async () => {
+    switchView('stats-view');
+    showLoading(true);
+    if (!currentUser) return;
+    
+    try {
+        // 今日を "YYYY-MM-DD" 形式で取得
+        const todayStr = new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replaceAll('/', '-');
+        
+        const logCol = collection(db, "users", currentUser.uid, "logs");
+        const snp = await getDocs(logCol);
+        const logs = snp.docs.map(d => ({ date: d.id, ...d.data() }));
+        
+        // 日付順（新しい順）に並び替え
+        logs.sort((a, b) => b.date.localeCompare(a.date));
+        
+        // 1. 今日の進捗（today-stats）を表示する
+        const todayStatsEl = document.getElementById('today-stats');
+        const todayLog = logs.find(l => l.date === todayStr);
+        
+        if (todayLog) {
+            const min = Math.floor(todayLog.seconds / 60);
+            todayStatsEl.innerHTML = `
+                <span class="next-study-icon">✨</span>
+                <div>
+                    <div class="next-study-label">今日の結果</div>
+                    <div class="next-study-value">${todayLog.count} 枚 / ${min} 分</div>
+                </div>
+            `;
+        } else {
+            todayStatsEl.innerHTML = `
+                <span class="next-study-icon">📔</span>
+                <div>
+                    <div class="next-study-label">今日の結果</div>
+                    <div class="next-study-value">今日の記録はまだありません</div>
+                </div>
+            `;
+        }
+
+        // 2. 過去の記録リスト（stats-log-list）を表示する
+        const listEl = document.getElementById('stats-log-list');
+        listEl.innerHTML = '';
+
+        if (logs.length === 0) {
+            listEl.innerHTML = '<li style="padding:20px; text-align:center; color:var(--text-sub);">記録がまだありません</li>';
+        } else {
+            logs.forEach(log => {
+                const min = Math.floor(log.seconds / 60);
+                const li = document.createElement('li');
+                li.style.flexDirection = 'column';
+                li.style.alignItems = 'flex-start';
+                li.style.gap = '8px';
+                li.innerHTML = `
+                    <div class="deck-name-row">
+                        <span>${log.date}</span>
+                    </div>
+                    <div class="deck-stats">
+                        <span class="stat-badge">${log.count} 枚</span>
+                        <span class="stat-badge">${min} 分</span>
+                    </div>
+                `;
+                listEl.appendChild(li);
+            });
+        }
+    } catch(e) { 
+        console.error("統計の取得に失敗しました:", e); 
+    }
+    showLoading(false);
+};
+
 document.addEventListener('keydown', (e) => {
-    // Study View Shortcuts
     if (document.getElementById('study-view').style.display === 'flex') {
         const cardObj = document.getElementById('card-obj');
         const isFlipped = cardObj.classList.contains('is-flipped');
-        
         if (e.code === 'Space' || e.key === 'Enter') {
-            e.preventDefault(); // Prevent scrolling
-            // Toggle Flip
+            e.preventDefault();
             if (!currentCard) return;
             const controls = document.getElementById('controls');
             if (!controls.classList.contains('visible')) {
                 controls.classList.add('visible');
-                // Re-enable buttons? logic is weird. renderCard resets buttons to enabled.
-                // rateCard disables them.
-                // If controls are hidden (new card), buttons SHOULD be enabled.
-                // updateButtonLabels just updates text.
                 updateButtonLabels();
             }
             cardObj.classList.toggle('is-flipped');
         } else if (isFlipped) {
-            // Rate 1-4
             if (e.key === '1') rateCard(1);
             if (e.key === '2') rateCard(2);
             if (e.key === '3') rateCard(3);
             if (e.key === '4') rateCard(4);
         }
-        
-        // Undo
         if (e.key === 'z' || e.key === 'Z') {
             if (!document.getElementById('btnUndo').disabled) handleUndo();
         }
     }
 });
 
-
 function showLoading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; }
 
-// --- Service Worker Registration ---
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')

@@ -7,11 +7,11 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>SmartSRS</title>
-    <meta name="data-app-version" content="1.0.1" />
+    <meta name="data-app-version" content="1.0.2" />
     <link rel="icon" href="img/logo.png" />
     <link rel="apple-touch-icon" href="img/logo.png" />
-    <link rel="manifest" href="manifest.json?v=1.0.1" />
-    <link rel="stylesheet" href="css/style.css?v=1.0.1" />
+    <link rel="manifest" href="manifest.json?v=1.0.0" />
+    <link rel="stylesheet" href="css/style.css?v=1.0.2" />
   </head>
   <body>
     <div id="loading" class="loading-overlay"><div class="spinner"></div></div>
@@ -53,6 +53,7 @@
       <header>
         <h1>📚 My Decks</h1>
         <div class="header-actions">
+          <button class="icon-btn" onclick="openStats()">📊</button>
           <button class="icon-btn" onclick="openSettings()">⚙️</button>
           <button class="icon-btn" onclick="showAddDeckModal()">➕</button>
         </div>
@@ -116,6 +117,23 @@
         "
       >
         Version: <span id="app-version"></span>
+      </div>
+    </div>
+    <div class="container" id="stats-view">
+      <header>
+        <button class="icon-btn" onclick="backToDecks()">←</button>
+        <h1>学習記録</h1>
+        <div class="spacer-40"></div>
+      </header>
+        <div class="settings-section">
+        <h3>今日の進捗</h3>
+        <div id="today-stats" class="next-study-info">
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>過去の記録</h3>
+        <ul class="settings-deck-list" id="stats-log-list">
+        </ul>
       </div>
     </div>
 
@@ -285,6 +303,6 @@
       </div>
     </div>
 
-    <script type="module" src="js/script.js?v=1.0.1"></script>
+    <script type="module" src="js/script.js?v=1.0.2"></script>
   </body>
 </html>
