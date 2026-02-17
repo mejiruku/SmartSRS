@@ -243,7 +243,13 @@ window.renderManagerList = renderManagerList;
 
 window.openEditModal = (cardId) => {
     editingCardId = cardId;
-    const deck = appData.decks.find(d => d.id === currentDeckId);
+    const deck = appData.decks.find(d => d.id === currentDeckId); 
+    
+    if (!deck) {
+        console.error("デッキが見つかりません");
+        return;
+    }
+    
     if (cardId) {
         const card = deck.cards.find(c => c.id === cardId);
         document.getElementById('modal-card-title').innerText = "カード編集";
