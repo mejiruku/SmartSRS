@@ -205,7 +205,15 @@ window.openStudy = (id) => {
 
 window.openManager = () => { switchView('manager-view'); renderManagerList(); };
 window.closeManager = () => { switchView('study-view'); refreshQueue(); };
-window.showDeckMenu = () => document.getElementById('modal-import').classList.add('active');
+
+// --- Deck Menu (Export/Import) ---
+window.showDeckMenu = () => {
+    document.getElementById('modal-deck-menu').classList.add('active');
+    // リセット
+    document.getElementById('import-text-area').value = '';
+    document.getElementById('fileInput').value = '';
+};
+
 window.startCramMode = () => { 
     isCramMode = true; sessionReviewedIds.clear(); historyStack = []; 
     const deck = appData.decks.find(d => d.id === currentDeckId);
@@ -299,36 +307,219 @@ window.deleteCard = () => {
     saveDeckToCloud(deck); window.closeModals(); renderManagerList();
 };
 
-window.handleImport = () => {
-    const file = document.getElementById('fileInput').files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const content = e.target.result;
-        const deck = appData.decks.find(d => d.id === currentDeckId);
-        try {
-            if (file.name.endsWith('.json')) { alert("設定画面の「復元」から行ってください"); return; }
-            const lines = content.trim().split('\n');
-            const firstLine = lines.find(l => l.trim().length > 0) || lines[0];
-            const delimiter = firstLine && firstLine.includes('\t') ? '\t' : ',';
-            let added = 0;
-            lines.forEach((l, i) => {
-                const c = l.split(delimiter);
-                if(c.length>=2) {
-                    deck.cards.push({
-                        id: 'imp_'+Date.now()+i, displayId: c[0] || "",
-                        question: c[1], answer: c[2], explanation: c[3]||"",
-                        dueDate: 0, interval: 0, reps: 0, ef: 2.5
-                    });
-                    added++;
-                }
-            });
-            saveDeckToCloud(deck); window.closeModals(); renderManagerList();
-            alert(`${added}件インポート完了`); refreshQueue();
-        } catch(err) { alert("エラー: " + err); }
-    };
-    reader.readAsText(file);
+// --- エクスポート機能 (CSV/TSV, 進捗あり/なし) ---
+window.exportDeckData = (format, withProgress) => {
+    const deck = appData.decks.find(d => d.id === currentDeckId);
+    if (!deck) return;
+
+    let content = "";
+    const delimiter = format === 'csv' ? ',' : '\t';
+    
+    // ヘッダー行
+    const headers = ["ID", "Question", "Answer", "Explanation"];
+    if (withProgress) {
+        headers.push("DueDate", "Interval", "Reps", "EF");
+    }
+    content += headers.map(h => escapeCell(h, delimiter)).join(delimiter) + "\n";
+
+    // データ行
+    deck.cards.forEach(c => {
+        const row = [
+            c.displayId || "",
+            c.question || "",
+            c.answer || "",
+            c.explanation || ""
+        ];
+        
+        if (withProgress) {
+            // 日付を ISO String にする (Excelでそのまま読める形式)
+            const dateStr = c.dueDate ? new Date(c.dueDate).toISOString() : "";
+            row.push(dateStr);
+            row.push(c.interval);
+            row.push(c.reps);
+            row.push(c.ef);
+        }
+
+        content += row.map(val => escapeCell(val, delimiter)).join(delimiter) + "\n";
+    });
+
+    // ファイルダウンロード
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // BOM
+    const blob = new Blob([bom, content], { type: format === 'csv' ? "text/csv" : "text/tab-separated-values" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${deck.name}_${withProgress ? 'full' : 'cards'}.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
 };
+
+// セルのエスケープ処理
+function escapeCell(text, delimiter) {
+    if (text === null || text === undefined) text = "";
+    text = String(text);
+    // 改行、区切り文字、ダブルクォートがあれば全体を囲む
+    if (text.includes('\n') || text.includes('\r') || text.includes(delimiter) || text.includes('"')) {
+        return '"' + text.replace(/"/g, '""') + '"';
+    }
+    return text;
+}
+
+// --- インポート機能 (ファイル or テキスト貼り付け) ---
+window.executeImport = async () => {
+    const fileInput = document.getElementById('fileInput');
+    const textArea = document.getElementById('import-text-area');
+    
+    let content = "";
+
+    // ファイルが選択されていればファイルを優先
+    if (fileInput.files && fileInput.files[0]) {
+        const file = fileInput.files[0];
+        try {
+            content = await readFileAsync(file);
+        } catch(e) {
+            alert("ファイル読み込みエラー: " + e);
+            return;
+        }
+    } else {
+        // ファイルがなければテキストエリアを使用
+        content = textArea.value;
+    }
+
+    if (!content.trim()) {
+        alert("インポートするデータがありません");
+        return;
+    }
+
+    processImportContent(content);
+};
+
+function readFileAsync(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = e => reject(e);
+        reader.readAsText(file);
+    });
+}
+
+function processImportContent(content) {
+    const deck = appData.decks.find(d => d.id === currentDeckId);
+    if (!deck) return;
+
+    // 区切り文字の自動判定
+    const firstLineEnd = content.indexOf('\n');
+    const firstLine = firstLineEnd > -1 ? content.substring(0, firstLineEnd) : content;
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+
+    try {
+        const rows = parseCSV(content, delimiter);
+        let addedCount = 0;
+        
+        rows.forEach((row, i) => {
+            if (row.length === 0 || (row.length === 1 && !row[0].trim())) return;
+            // ヘッダー行スキップ (簡易判定)
+            if (i === 0 && (row[0] === 'ID' || row[1] === 'Question')) return;
+
+            // 最低限 QとA
+            const did = row[0] || "";
+            const q = row[1] || "";
+            const a = row[2] || "";
+            const exp = row[3] || "";
+            
+            if (!q || !a) return; 
+
+            // 進捗データ読み込み
+            let dueDate = 0;
+            let interval = 0;
+            let reps = 0;
+            let ef = 2.5;
+
+            if (row.length >= 8) {
+                if (row[4]) dueDate = new Date(row[4]).getTime();
+                if (row[5]) interval = parseFloat(row[5]);
+                if (row[6]) reps = parseInt(row[6]);
+                if (row[7]) ef = parseFloat(row[7]);
+                
+                if (isNaN(dueDate)) dueDate = 0;
+                if (isNaN(interval)) interval = 0;
+                if (isNaN(reps)) reps = 0;
+                if (isNaN(ef)) ef = 2.5;
+            }
+
+            deck.cards.push({
+                id: 'imp_' + Date.now() + '_' + i,
+                displayId: did,
+                question: q,
+                answer: a,
+                explanation: exp,
+                dueDate: dueDate,
+                interval: interval,
+                reps: reps,
+                ef: ef
+            });
+            addedCount++;
+        });
+
+        saveDeckToCloud(deck);
+        window.closeModals();
+        renderManagerList();
+        alert(`${addedCount}件 インポートしました！`);
+        refreshQueue(); 
+
+    } catch (err) {
+        console.error(err);
+        alert("インポートエラー。フォーマットを確認してください。");
+    }
+}
+
+function parseCSV(text, delimiter) {
+    const rows = [];
+    let currentRow = [];
+    let currentCell = "";
+    let insideQuote = false;
+    
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i + 1];
+
+        if (insideQuote) {
+            if (char === '"') {
+                if (nextChar === '"') {
+                    currentCell += '"';
+                    i++; 
+                } else {
+                    insideQuote = false;
+                }
+            } else {
+                currentCell += char;
+            }
+        } else {
+            if (char === '"') {
+                insideQuote = true;
+            } else if (char === delimiter) {
+                currentRow.push(currentCell);
+                currentCell = "";
+            } else if (char === '\n' || char === '\r') {
+                if (char === '\r' && nextChar === '\n') {
+                    i++;
+                }
+                currentRow.push(currentCell);
+                rows.push(currentRow);
+                currentRow = [];
+                currentCell = "";
+            } else {
+                currentCell += char;
+            }
+        }
+    }
+    if (currentCell || currentRow.length > 0) {
+        currentRow.push(currentCell);
+        rows.push(currentRow);
+    }
+    return rows;
+}
+
 
 window.exportAllData = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
@@ -656,24 +847,19 @@ async function saveStudyLog(count, seconds) {
     }
 }
 
-// --- 統計表示ロジック（修正版） ---
+// --- 統計表示ロジック ---
 window.openStats = async () => {
     switchView('stats-view');
     showLoading(true);
     if (!currentUser) return;
     
     try {
-        // 今日を "YYYY-MM-DD" 形式で取得
         const todayStr = new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replaceAll('/', '-');
-        
         const logCol = collection(db, "users", currentUser.uid, "logs");
         const snp = await getDocs(logCol);
         const logs = snp.docs.map(d => ({ date: d.id, ...d.data() }));
-        
-        // 日付順（新しい順）に並び替え
         logs.sort((a, b) => b.date.localeCompare(a.date));
         
-        // 1. 今日の進捗（today-stats）を表示する
         const todayStatsEl = document.getElementById('today-stats');
         const todayLog = logs.find(l => l.date === todayStr);
         
@@ -696,10 +882,8 @@ window.openStats = async () => {
             `;
         }
 
-        // 2. 過去の記録リスト（stats-log-list）を表示する
         const listEl = document.getElementById('stats-log-list');
         listEl.innerHTML = '';
-
         if (logs.length === 0) {
             listEl.innerHTML = '<li style="padding:20px; text-align:center; color:var(--text-sub);">記録がまだありません</li>';
         } else {

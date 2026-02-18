@@ -761,3 +761,65 @@ h1 {
     align-items: flex-start;
     gap: 8px;
 }
+
+/* --- modal-deck-menu 用のスタイル追加 --- */
+.menu-section {
+    margin-bottom: 15px;
+}
+.menu-section h4 {
+    margin: 0 0 8px 0;
+    color: var(--text);
+    font-size: 1rem;
+}
+.desc-text {
+    font-size: 0.85rem;
+    color: var(--text-sub);
+    margin: 0 0 10px 0;
+    line-height: 1.4;
+}
+.separator {
+    border: 0;
+    border-top: 1px solid #e5e7eb;
+    margin: 20px 0;
+}
+.export-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.btn-group-label {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: var(--text-sub);
+    width: 80px;
+}
+.small-btn {
+    flex: 1;
+    padding: 8px;
+    font-size: 0.85rem;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text);
+}
+.small-btn:hover {
+    background: #e5e7eb;
+}
+#import-text-area {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-family: monospace; /* データを見やすく */
+    font-size: 0.9rem;
+    resize: vertical;
+}
+#import-text-area:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+.mt-5 {
+    margin-top: 5px;
+}
