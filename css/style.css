@@ -830,16 +830,13 @@ white-space: pre-wrap;/**/
 /* --- オフライン通知バナー --- */
 #offline-banner {
   display: none;
-  background-color: var(--danger);
-  color: white;
-  text-align: center;
-  padding: 8px;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 2000;
-  font-size: 0.9rem;
-  font-weight: bold;
+  background-color:
+  #ef4444; color:
+  white; text-align:
+  center; padding: 8px;
+  position: fixed; top: 0;
+  left: 0; width: 100%;
+  z-index: 2000; font-size:
+  0.9rem; font-weight: bold;
   box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
