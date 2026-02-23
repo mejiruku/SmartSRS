@@ -7,13 +7,16 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>SmartSRS</title>
-    <meta name="data-app-version" content="1.0.5" />
+    <meta name="data-app-version" content="1.0.6" />
     <link rel="icon" href="img/logo.png" />
     <link rel="apple-touch-icon" href="img/logo.png" />
     <link rel="manifest" href="manifest.json?v=1.0.0" />
-    <link rel="stylesheet" href="css/style.css?v=1.0.5" />
+    <link rel="stylesheet" href="css/style.css?v=1.0.6" />
   </head>
   <body>
+    <div id="offline-banner">
+      現在オフラインです。データは一時保存され、通信回復後に同期されます。
+    </div>
     <div id="loading" class="loading-overlay"><div class="spinner"></div></div>
 
     <div id="auth-view">
@@ -327,7 +330,7 @@
         <button class="secondary-btn mt-20" onclick="closeModals()">閉じる</button>
       </div>
     </div>
-
-    <script type="module" src="js/script.js?v=1.0.5"></script>
+<script src="js/offline-check.js"></script>
+    <script type="module" src="js/script.js?v=1.0.6"></script>
   </body>
 </html>

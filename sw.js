@@ -4,7 +4,8 @@ const urlsToCache = [
     './index.html',
     './manifest.json',
     './css/style.css',     // CSSファイル
-    './js/script.js',     // JSファイル
+    './js/script.js',// JSファイル
+    './js/offline-check.js',
     './js/firebase-init.js',
     './img/logo.png', // 画像
     'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg'
@@ -55,7 +56,7 @@ self.addEventListener('fetch', function(event) {
 
     event.respondWith(
         caches.open(CACHE_NAME).then(function(cache) {
-            return cache.match(event.request).then(function(cachedResponse) {
+            return cache.match(event.request, { ignoreSearch: true }).then(function(cachedResponse) {
                 // ネットワークから最新版を取得（バックグラウンド）
                 const fetchPromise = fetch(event.request).then(function(networkResponse) {
                     // 成功したレスポンスのみキャッシュを更新

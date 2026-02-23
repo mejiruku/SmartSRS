@@ -18,15 +18,29 @@ let sessionCardsCount = 0;
 
 const STORAGE_KEY = 'smart_srs_v3'; 
 
+const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), ms));
+
 onAuthStateChanged(auth, async (user) => {
     const authView = document.getElementById('auth-view');
     if (user) {
         currentUser = user;
         document.getElementById('user-email-display').innerText = user.email;
         authView.style.display = 'none';
-        showLoading(true);
-        await loadDataFromCloud();
-        showLoading(false);
+        showLoading(true); // ローディング表示開始
+
+        try {
+            // loadDataFromCloud() と 10秒(10000ms) のタイムアウトを競合させる
+            await Promise.race([loadDataFromCloud(), timeout(10000)]);
+        } catch (error) {
+            console.error("読み込みエラー:", error);
+            if (error.message === "TIMEOUT") {
+                alert("通信がタイムアウトしました。電波状況の良いところで再度リロードしてください。");
+            } else {
+                alert("データの読み込みに失敗しました。");
+            }
+        }
+
+        showLoading(false); // エラーが起きても起きなくてもローディングを消す
         switchView('deck-list-view');
         renderDeckList();
     } else {
@@ -851,7 +865,10 @@ async function saveStudyLog(count, seconds) {
 window.openStats = async () => {
     switchView('stats-view');
     showLoading(true);
-    if (!currentUser) return;
+    if (!currentUser) {
+        showLoading(false);
+        return;
+    }
     
     try {
         const todayStr = new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replaceAll('/', '-');

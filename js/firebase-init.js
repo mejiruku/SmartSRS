@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+// getFirestore の代わりに initializeFirestore と persistentLocalCache を読み込む
+import { initializeFirestore, persistentLocalCache } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCLJG-ExZC7dVOcSL0Tfzdv965ewCj_uGs",
@@ -14,6 +15,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+
+// オフライン永続化（キャッシュ）を有効にしてデータベースを初期化
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache()
+});
 
 export { app, auth, db };
