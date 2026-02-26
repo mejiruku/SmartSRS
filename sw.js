@@ -1,4 +1,4 @@
-const CACHE_NAME = 'StudyReport-v3'; // バージョン管理
+const CACHE_NAME = 'StudyReport-v4'; // バージョン管理
 const urlsToCache = [
     './',              // index.html
     './index.html',
