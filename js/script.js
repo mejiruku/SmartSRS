@@ -23,29 +23,38 @@ const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new E
 onAuthStateChanged(auth, async (user) => {
     const authView = document.getElementById('auth-view');
     if (user) {
+        // --- ログイン済みの処理 ---
         currentUser = user;
         document.getElementById('user-email-display').innerText = user.email;
-        authView.style.display = 'none';
-        showLoading(true); // ローディング表示開始
+        authView.style.display = 'none'; // 念のため非表示維持
+        
+        // CSSで最初からローディングが出ているので、showLoading(true)は実質不要ですが、
+        // 処理の明示として残しておいても問題ありません。
+        showLoading(true);
 
         try {
-            // loadDataFromCloud() と 10秒(10000ms) のタイムアウトを競合させる
             await Promise.race([loadDataFromCloud(), timeout(10000)]);
         } catch (error) {
             console.error("読み込みエラー:", error);
             if (error.message === "TIMEOUT") {
-                alert("通信がタイムアウトしました。電波状況の良いところで再度リロードしてください。");
+                alert("通信がタイムアウトしました。");
             } else {
                 alert("データの読み込みに失敗しました。");
             }
         }
 
-        showLoading(false); // エラーが起きても起きなくてもローディングを消す
+        showLoading(false); // 読み込み完了したらローディングを消す
         switchView('deck-list-view');
         renderDeckList();
     } else {
+        // --- 未ログインの処理 ---
         currentUser = null;
         document.querySelectorAll('.container').forEach(el => el.style.display = 'none');
+        
+        // ★ ここが重要：CSSで表示されっぱなしのローディング画面を消す
+        showLoading(false);
+        
+        // その後、ログイン画面を表示する
         authView.style.display = 'flex';
     }
 });
