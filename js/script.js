@@ -69,10 +69,19 @@ onAuthStateChanged(auth, async (user) => {
 // --- 通知用トークンを取得してFirestoreに保存する関数 ---
 async function saveDeviceToken() {
     if (!currentUser) return;
+    
     try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-            const registration = await navigator.serviceWorker.ready;
+            
+            // 👇 修正ポイント：ここで確実に sw.js を登録し、準備完了を待つ
+            let registration;
+            if ('serviceWorker' in navigator) {
+                registration = await navigator.serviceWorker.register('./sw.js');
+                await navigator.serviceWorker.ready; // 準備ができるまで待機
+            }
+
+            // 準備ができた sw.js をFirebaseに渡す
             const currentToken = await getToken(messaging, {
                 vapidKey: 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA',
                 serviceWorkerRegistration: registration
@@ -80,7 +89,7 @@ async function saveDeviceToken() {
 
             if (currentToken) {
                 console.log('デバイストークンを取得:', currentToken);
-                // Firestoreの users/{uid}/tokens/{token} に保存する (スマホとPCなど複数端末対応のため)
+                // Firestoreの users/{uid}/tokens/{token} に保存する
                 const tokenRef = doc(db, "users", currentUser.uid, "tokens", currentToken);
                 await setDoc(tokenRef, {
                     token: currentToken,
@@ -94,7 +103,6 @@ async function saveDeviceToken() {
         console.error('トークン取得エラー:', error);
     }
 }
-
 
 // --- Login Bypass (Test Mode) ---
 let loginPressTimer;
