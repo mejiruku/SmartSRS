@@ -1,4 +1,4 @@
-const CACHE_NAME = '1.0.13'; // バージョン管理
+const CACHE_NAME = '1.0.14'; // バージョン管理
 const urlsToCache = [
     './',              // index.html
     './index.html',
@@ -98,11 +98,10 @@ const messaging = firebase.messaging();
 
 // バックグラウンドで通知を受け取った時の処理
 messaging.onBackgroundMessage(function(payload) {
-  const notificationTitle = payload.notification.title || 'SmartSRS';
+  const notificationTitle = payload.data.title || 'SmartSRS';
   const notificationOptions = {
-    body: payload.notification.body,
+    body: payload.data.body || '',
     icon: './img/logo.png',
-    // 👇 追加：送られてきたデータ（URL）を保持する
     data: {
       url: payload.data ? payload.data.url : './'
     }
