@@ -1,6 +1,9 @@
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-import { auth, db } from "./firebase-init.js";
+// 👇 通知用の getToken を読み込む
+import { getToken } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
+// 👇 firebase-init.js から messaging も受け取るように修正
+import { auth, db, messaging } from "./firebase-init.js";
 
 let appData = { decks: [] };
 let currentUser = null;
@@ -46,6 +49,10 @@ onAuthStateChanged(auth, async (user) => {
         showLoading(false); // 読み込み完了したらローディングを消す
         switchView('deck-list-view');
         renderDeckList();
+
+        // 👇 ログイン完了後にトークンを取得＆保存する処理を呼び出す
+        saveDeviceToken();
+
     } else {
         // --- 未ログインの処理 ---
         currentUser = null;
@@ -58,6 +65,37 @@ onAuthStateChanged(auth, async (user) => {
         authView.style.display = 'flex';
     }
 });
+
+// --- 通知用トークンを取得してFirestoreに保存する関数 ---
+async function saveDeviceToken() {
+    if (!currentUser) return;
+    
+    try {
+        // 通知の許可をユーザーに求める
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            // 👇 取得したVAPIDキーを設定
+            const currentToken = await getToken(messaging, {
+                vapidKey: 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA'
+            });
+
+            if (currentToken) {
+                console.log('デバイストークンを取得:', currentToken);
+                // Firestoreの users/{uid}/tokens/{token} に保存する (スマホとPCなど複数端末対応のため)
+                const tokenRef = doc(db, "users", currentUser.uid, "tokens", currentToken);
+                await setDoc(tokenRef, {
+                    token: currentToken,
+                    updatedAt: Date.now()
+                });
+            }
+        } else {
+            console.log('通知が許可されませんでした');
+        }
+    } catch (error) {
+        console.error('トークン取得エラー:', error);
+    }
+}
+
 
 // --- Login Bypass (Test Mode) ---
 let loginPressTimer;

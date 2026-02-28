@@ -1,4 +1,4 @@
-const CACHE_NAME = '1.0.8'; // バージョン管理
+const CACHE_NAME = '1.0.9'; // バージョン管理
 const urlsToCache = [
     './',              // index.html
     './index.html',
