@@ -1,4 +1,4 @@
-const CACHE_NAME = '1.0.9'; // バージョン管理
+const CACHE_NAME = '1.0.10'; // バージョン管理
 const urlsToCache = [
     './',              // index.html
     './index.html',
@@ -75,4 +75,33 @@ self.addEventListener('fetch', function(event) {
             });
         })
     );
+});
+
+
+// ==========================================
+// ここからプッシュ通知（バックグラウンド）を受け取るための設定
+// Service Worker内では importScripts でFirebaseを読み込みます
+// ==========================================
+importScripts('https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js');
+
+firebase.initializeApp({
+  apiKey: "AIzaSyCLJG-ExZC7dVOcSL0Tfzdv965ewCj_uGs",
+  projectId: "flipcard-318f3",
+  messagingSenderId: "517432601240",
+  appId: "1:517432601240:web:9df881ed3f3c3b3bbb3eed"
+});
+
+const messaging = firebase.messaging();
+
+// バックグラウンドで通知を受け取った時の処理
+messaging.onBackgroundMessage(function(payload) {
+  console.log('バックグラウンド通知を受信: ', payload);
+  const notificationTitle = payload.notification.title || 'SmartSRS';
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: './img/logo.png'
+  };
+
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });

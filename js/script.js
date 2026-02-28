@@ -69,14 +69,13 @@ onAuthStateChanged(auth, async (user) => {
 // --- 通知用トークンを取得してFirestoreに保存する関数 ---
 async function saveDeviceToken() {
     if (!currentUser) return;
-    
     try {
-        // 通知の許可をユーザーに求める
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-            // 👇 取得したVAPIDキーを設定
+            const registration = await navigator.serviceWorker.ready;
             const currentToken = await getToken(messaging, {
-                vapidKey: 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA'
+                vapidKey: 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA',
+                serviceWorkerRegistration: registration
             });
 
             if (currentToken) {
