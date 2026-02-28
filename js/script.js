@@ -29,10 +29,8 @@ onAuthStateChanged(auth, async (user) => {
         // --- ログイン済みの処理 ---
         currentUser = user;
         document.getElementById('user-email-display').innerText = user.email;
-        authView.style.display = 'none'; // 念のため非表示維持
+        authView.style.display = 'none';
         
-        // CSSで最初からローディングが出ているので、showLoading(true)は実質不要ですが、
-        // 処理の明示として残しておいても問題ありません。
         showLoading(true);
 
         try {
@@ -46,25 +44,38 @@ onAuthStateChanged(auth, async (user) => {
             }
         }
 
-        showLoading(false); // 読み込み完了したらローディングを消す
+        showLoading(false);
         switchView('deck-list-view');
         renderDeckList();
 
-        // 👇 ログイン完了後にトークンを取得＆保存する処理を呼び出す
+        // ログイン完了後にトークンを取得＆保存
         saveDeviceToken();
+
+        // 👇 通知からの遷移：URLパラメータをチェックして特定のデッキを開く
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetDeckId = urlParams.get('openDeck');
+        if (targetDeckId) {
+            setTimeout(() => {
+                window.openStudy(targetDeckId);
+                // URLを綺麗にする
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 500);
+        }
 
     } else {
         // --- 未ログインの処理 ---
         currentUser = null;
         document.querySelectorAll('.container').forEach(el => el.style.display = 'none');
         
-        // ★ ここが重要：CSSで表示されっぱなしのローディング画面を消す
         showLoading(false);
         
-        // その後、ログイン画面を表示する
+        // ログイン画面を表示
         authView.style.display = 'flex';
     }
 });
+
+
+
 
 // --- 通知用トークンを取得してFirestoreに保存する関数 ---
 async function saveDeviceToken() {

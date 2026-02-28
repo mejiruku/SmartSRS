@@ -1,4 +1,4 @@
-const CACHE_NAME = '1.0.11'; // バージョン管理
+const CACHE_NAME = '1.0.12'; // バージョン管理
 const urlsToCache = [
     './',              // index.html
     './index.html',
@@ -94,14 +94,42 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// --- sw.js の一番下を以下に差し替え ---
+
 // バックグラウンドで通知を受け取った時の処理
 messaging.onBackgroundMessage(function(payload) {
-  console.log('バックグラウンド通知を受信: ', payload);
   const notificationTitle = payload.notification.title || 'SmartSRS';
   const notificationOptions = {
     body: payload.notification.body,
-    icon: './img/logo.png'
+    icon: './img/logo.png',
+    // 👇 追加：送られてきたデータ（URL）を保持する
+    data: {
+      url: payload.data ? payload.data.url : './'
+    }
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// 👇 追加：通知をクリックした時の動作
+self.addEventListener('notificationclick', function(event) {
+  event.notification.close(); // 通知を閉じる
+
+  // 通知に含まれているURLを取得
+  const urlToOpen = event.notification.data.url || './';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      // すでにアプリが開いていればそこにフォーカス
+      for (const client of clientList) {
+        if (client.url.includes('SmartSRS') && 'focus' in client) {
+          return client.focus().then(c => c.navigate(urlToOpen));
+        }
+      }
+      // 開いていなければ新しく開く
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });
