@@ -1,7 +1,7 @@
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 // 👇 通知用の getToken を読み込む
-import { getToken } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
+import { getToken, deleteToken } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 // 👇 firebase-init.js から messaging も受け取るように修正
 import { auth, db, messaging } from "./firebase-init.js";
 
@@ -48,8 +48,10 @@ onAuthStateChanged(auth, async (user) => {
         switchView('deck-list-view');
         renderDeckList();
 
-        // ログイン完了後にトークンを取得＆保存
-        saveDeviceToken();
+        // ログイン完了後、以前に通知がONにされていればトークンを取得
+        if (localStorage.getItem('notify_on_' + currentUser.uid) === '1') {
+            saveDeviceToken();
+        }
 
         // 👇 通知からの遷移：URLパラメータをチェックして特定のデッキを開く
         const urlParams = new URLSearchParams(window.location.search);
@@ -84,7 +86,7 @@ async function saveDeviceToken() {
     try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
-            
+            localStorage.setItem('notify_on_' + currentUser.uid, '1');
             // 👇 修正ポイント：ここで確実に sw.js を登録し、準備完了を待つ
             let registration;
             if ('serviceWorker' in navigator) {
@@ -114,6 +116,42 @@ async function saveDeviceToken() {
         console.error('トークン取得エラー:', error);
     }
 }
+
+window.disableNotifications = async () => {
+    if (!currentUser) return;
+    try {
+        localStorage.removeItem('notify_on_' + currentUser.uid);
+        
+        let registration;
+        if ('serviceWorker' in navigator) {
+            registration = await navigator.serviceWorker.getRegistration('./sw.js');
+        }
+
+        if (registration) {
+            const currentToken = await getToken(messaging, {
+                vapidKey: 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA',
+                serviceWorkerRegistration: registration
+            });
+            if (currentToken) {
+                const tokenRef = doc(db, "users", currentUser.uid, "tokens", currentToken);
+                await deleteDoc(tokenRef); // DBから削除
+                await deleteToken(messaging); // Firebase Messagingから削除
+                console.log('通知トークンを削除しました。');
+            }
+        }
+    } catch (e) {
+        console.error('通知の無効化に失敗しました:', e);
+    }
+};
+
+window.toggleNotificationSetting = async () => {
+    const isChecked = document.getElementById('notification-toggle').checked;
+    if (isChecked) {
+        await saveDeviceToken();
+    } else {
+        await disableNotifications();
+    }
+};
 
 // --- Login Bypass (Test Mode) ---
 let loginPressTimer;
@@ -238,6 +276,66 @@ window.openSettings = () => {
     const meta = document.querySelector('meta[name="data-app-version"]');
     if (meta) {
         document.getElementById('app-version').innerText = meta.content;
+    }
+    
+    // 通知状態の表示を更新
+    updateNotificationStatusDisplay();
+};
+
+function updateNotificationStatusDisplay() {
+    const statusDisplay = document.getElementById('notification-status-display');
+    const btnRequest = document.getElementById('btn-request-notification');
+    const toggleContainer = document.getElementById('notification-toggle-container');
+    const toggleCheckbox = document.getElementById('notification-toggle');
+    
+    if (!('Notification' in window)) {
+        statusDisplay.innerText = "このブラウザはプッシュ通知をサポートしていません。";
+        statusDisplay.className = "user-email-display text-sub";
+        statusDisplay.style.display = 'block';
+        btnRequest.style.display = 'none';
+        toggleContainer.style.display = 'none';
+        return;
+    }
+
+    switch (Notification.permission) {
+        case 'granted':
+            statusDisplay.style.display = 'none';
+            btnRequest.style.display = 'none';
+            toggleContainer.style.display = 'flex';
+            toggleCheckbox.checked = (currentUser && localStorage.getItem('notify_on_' + currentUser.uid) === '1');
+            break;
+        case 'denied':
+            statusDisplay.innerText = "通知は『ブロック』されています ❌\n(ブラウザの設定から解除してください)";
+            statusDisplay.className = "user-email-display text-danger";
+            statusDisplay.style.display = 'block';
+            btnRequest.style.display = 'none';
+            toggleContainer.style.display = 'none';
+            break;
+        default:
+            statusDisplay.innerText = "通知を受信するには許可が必要です。";
+            statusDisplay.className = "user-email-display text-sub";
+            statusDisplay.style.display = 'block';
+            btnRequest.style.display = 'block';
+            toggleContainer.style.display = 'none';
+            break;
+    }
+}
+
+window.requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+         alert("このブラウザはプッシュ通知をサポートしていません。");
+         return;
+    }
+    try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+             await saveDeviceToken();
+             alert("通知を許可しました！");
+        }
+        updateNotificationStatusDisplay();
+    } catch (e) {
+        console.error("通知の許可リクエスト中にエラーが発生しました:", e);
+        alert("エラーが発生しました。");
     }
 };
 

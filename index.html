@@ -7,11 +7,11 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>SmartSRS</title>
-    <meta name="data-app-version" content="1.0.12" />
+    <meta name="data-app-version" content="1.0.13" />
     <link rel="icon" href="img/logo.png" />
     <link rel="apple-touch-icon" href="img/logo.png" />
     <link rel="manifest" href="manifest.json?v=1.0.0" />
-    <link rel="stylesheet" href="css/style.css?v=1.0.12" />
+    <link rel="stylesheet" href="css/style.css?v=1.0.13" />
   </head>
   <body>
     <div id="offline-banner">
@@ -109,6 +109,23 @@
       <div class="settings-section">
         <h3>デッキ管理</h3>
         <ul class="settings-deck-list" id="settings-deck-list"></ul>
+      </div>
+
+      <div class="settings-section">
+        <h3>通知</h3>
+        <p id="notification-status-display" class="user-email-display"></p>
+        
+        <div id="notification-toggle-container" style="display: none; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+          <span style="font-weight: bold; color: var(--text);">プッシュ通知を受け取る</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="notification-toggle" onchange="toggleNotificationSetting()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <button class="btn-block btn-data" id="btn-request-notification" onclick="requestNotificationPermission()">
+          🔔 通知を許可する
+        </button>
       </div>
 
       <div
@@ -331,6 +348,6 @@
       </div>
     </div>
 <script src="js/offline-check.js"></script>
-    <script type="module" src="js/script.js?v=1.0.12"></script>
+    <script type="module" src="js/script.js?v=1.0.13"></script>
   </body>
 </html>
