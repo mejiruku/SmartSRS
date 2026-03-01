@@ -256,7 +256,7 @@ h1 {
   font-weight: bold;
   line-height: 1.4;
   word-break: break-word;
-white-space: pre-wrap;/**/
+  white-space: pre-wrap; /**/
   /* flex: 1;  ← これを削除 */
   display: flex;
   flex-direction: column;
@@ -270,7 +270,7 @@ white-space: pre-wrap;/**/
   color: var(--primary);
   line-height: 1.4;
   word-break: break-word;
-  white-space: pre-wrap;/**/
+  white-space: pre-wrap; /**/
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -283,7 +283,7 @@ white-space: pre-wrap;/**/
   color: var(--text-sub);
   line-height: 1.6;
   overflow-y: auto;
-  white-space: pre-wrap;/**/
+  white-space: pre-wrap; /**/
   /* flex: 1;  ← これを削除 */
   width: 100%;
   text-align: center; /* left から center に変更 */
@@ -565,14 +565,14 @@ white-space: pre-wrap;/**/
   display: none !important;
 }
 .loading-overlay {
-  width: 100vw;  /* 100% から 100vw に変更 */
+  width: 100vw; /* 100% から 100vw に変更 */
   height: 100vh; /* 100% から 100vh に変更 */
   align-items: center;
   position: fixed;
   top: 0;
   left: 0;
   background: rgba(255, 255, 255, 0.8);
-  display: flex; 
+  display: flex;
   justify-content: center;
   z-index: 999;
 }
@@ -786,7 +786,7 @@ white-space: pre-wrap;/**/
   right: 0;
   bottom: 0;
   background-color: #ccc;
-  transition: .4s;
+  transition: 0.4s;
   border-radius: 34px;
 }
 
@@ -798,9 +798,9 @@ white-space: pre-wrap;/**/
   left: 4px;
   bottom: 4px;
   background-color: white;
-  transition: .4s;
+  transition: 0.4s;
   border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .toggle-switch input:checked + .slider {
@@ -815,85 +815,87 @@ white-space: pre-wrap;/**/
   transform: translateX(22px);
 }
 
-
 #stats-log-list li {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 /* --- modal-deck-menu 用のスタイル追加 --- */
 .menu-section {
-    margin-bottom: 15px;
+  margin-bottom: 15px;
 }
 .menu-section h4 {
-    margin: 0 0 8px 0;
-    color: var(--text);
-    font-size: 1rem;
+  margin: 0 0 8px 0;
+  color: var(--text);
+  font-size: 1rem;
 }
 .desc-text {
-    font-size: 0.85rem;
-    color: var(--text-sub);
-    margin: 0 0 10px 0;
-    line-height: 1.4;
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin: 0 0 10px 0;
+  line-height: 1.4;
 }
 .separator {
-    border: 0;
-    border-top: 1px solid #e5e7eb;
-    margin: 20px 0;
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 20px 0;
 }
 .export-buttons {
-    display: flex;
-    gap: 8px;
-    align-items: center;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .btn-group-label {
-    font-size: 0.8rem;
-    font-weight: bold;
-    color: var(--text-sub);
-    width: 80px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--text-sub);
+  width: 80px;
 }
 .small-btn {
-    flex: 1;
-    padding: 8px;
-    font-size: 0.85rem;
-    background: #f3f4f6;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    cursor: pointer;
-    color: var(--text);
+  flex: 1;
+  padding: 8px;
+  font-size: 0.85rem;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
 }
 .small-btn:hover {
-    background: #e5e7eb;
+  background: #e5e7eb;
 }
 #import-text-area {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 10px;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
-    font-family: monospace; /* データを見やすく */
-    font-size: 0.9rem;
-    resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-family: monospace; /* データを見やすく */
+  font-size: 0.9rem;
+  resize: vertical;
 }
 #import-text-area:focus {
-    border-color: var(--primary);
-    outline: none;
+  border-color: var(--primary);
+  outline: none;
 }
 .mt-5 {
-    margin-top: 5px;
+  margin-top: 5px;
 }
 
 /* --- オフライン通知バナー --- */
 #offline-banner {
   display: none;
-  background-color:
-  #ef4444; color:
-  white; text-align:
-  center; padding: 8px;
-  position: fixed; top: 0;
-  left: 0; width: 100%;
-  z-index: 2000; font-size:
-  0.9rem; font-weight: bold;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  background-color: #ef4444;
+  color: white;
+  text-align: center;
+  padding: 8px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 2000;
+  font-size: 0.9rem;
+  font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }

@@ -19,7 +19,9 @@ let historyStack = [];
 let sessionStartTime = null; 
 let sessionCardsCount = 0;   
 
-const STORAGE_KEY = 'smart_srs_v3'; 
+const STORAGE_KEY = 'smart_srs_v3';
+// 【整理】VAPID キーを一か所で管理
+const VAPID_KEY = 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA';
 
 const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), ms));
 
@@ -94,7 +96,7 @@ async function saveDeviceToken() {
 
             // 準備ができた sw.js をFirebaseに渡す
             const currentToken = await getToken(messaging, {
-                vapidKey: 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA',
+                vapidKey: VAPID_KEY,
                 serviceWorkerRegistration: registration
             });
 
@@ -128,7 +130,7 @@ window.disableNotifications = async () => {
 
         if (registration) {
             const currentToken = await getToken(messaging, {
-                vapidKey: 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA',
+                vapidKey: VAPID_KEY,
                 serviceWorkerRegistration: registration
             });
             if (currentToken) {
@@ -156,7 +158,8 @@ window.toggleNotificationSetting = async () => {
         // オフにした時に、DBのトークンも削除してサーバー通知を止める
         await disableNotifications();
     }
-    updateNotificationStatusDisplay();
+    // 【修正】非同期処理なので await を付けてエラーを捕捉できるようにする
+    await updateNotificationStatusDisplay();
 };
 
 // --- Login Bypass (Test Mode) ---
@@ -276,7 +279,8 @@ function initDefaultData() {
     appData = { decks: [] };
 }
 
-window.openSettings = () => { 
+// 【修正】async に変更し、内部の await を正しく扱えるようにする
+window.openSettings = async () => { 
     switchView('settings-view'); 
     renderSettingsDeckList(); 
     const meta = document.querySelector('meta[name="data-app-version"]');
@@ -284,8 +288,8 @@ window.openSettings = () => {
         document.getElementById('app-version').innerText = meta.content;
     }
     
-    // 通知状態の表示を更新
-    updateNotificationStatusDisplay();
+    // 【修正】通知状態の更新を await して非同期エラーを捕捉できるようにする
+    await updateNotificationStatusDisplay();
 };
 
 async function updateNotificationStatusDisplay() {
@@ -444,7 +448,8 @@ window.handleUndo = () => {
     const deck = appData.decks.find(d => d.id === currentDeckId);
     const idx = deck.cards.findIndex(c => c.id === prevCard.id);
     if (idx !== -1) deck.cards[idx] = prevCard;
-    if (prevState.isCramMode) sessionReviewedIds.delete(prevCard.id);
+    // 【修正】cramMode に限らず常に reviewedIds からカードを外す（通常モードでも Undo でキューに戻す）
+    sessionReviewedIds.delete(prevCard.id);
     if (sessionCardsCount > 0) sessionCardsCount--; 
     saveDeckToCloud(deck); refreshQueue(); updateUndoButton();
 };
@@ -734,7 +739,9 @@ window.restoreData = (input) => {
 };
 
 window.renameDeck = (id) => {
-    const deck = appData.decks.find(id => id.id === id);
+    // 【修正】find の仮引数を d に変更（id という名前だと外側の引数 id が隠れ、常に undefined になるバグを修正）
+    const deck = appData.decks.find(d => d.id === id);
+    if (!deck) return;
     const name = prompt("新しい名前:", deck.name);
     if(name && name!==deck.name) { deck.name=name; saveDeckToCloud(deck); renderSettingsDeckList(); }
 };
