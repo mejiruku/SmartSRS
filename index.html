@@ -7,11 +7,11 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>SmartSRS</title>
-    <meta name="data-app-version" content="1.0.14" />
+    <meta name="data-app-version" content="1.0.15" />
     <link rel="icon" href="img/logo.png" />
     <link rel="apple-touch-icon" href="img/logo.png" />
     <link rel="manifest" href="manifest.json?v=1.0.0" />
-    <link rel="stylesheet" href="css/style.css?v=1.0.14" />
+    <link rel="stylesheet" href="css/style.css?v=1.0.15" />
   </head>
   <body>
     <div id="offline-banner">
@@ -112,21 +112,41 @@
       </div>
 
       <div class="settings-section">
-        <h3>通知</h3>
-        <p id="notification-status-display" class="user-email-display"></p>
-        
-        <div id="notification-toggle-container" style="display: none; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-          <span style="font-weight: bold; color: var(--text);">プッシュ通知を受け取る</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="notification-toggle" onchange="toggleNotificationSetting()">
-            <span class="slider"></span>
-          </label>
-        </div>
+  <h3>通知</h3>
+  <p id="notification-status-display" class="user-email-display"></p>
+  
+  <div id="notification-toggle-container" style="display: none; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+    <span style="font-weight: bold; color: var(--text);">プッシュ通知を受け取る</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="notification-toggle" onchange="toggleNotificationSetting()">
+      <span class="slider"></span>
+    </label>
+  </div>
 
-        <button class="btn-block btn-data" id="btn-request-notification" onclick="requestNotificationPermission()">
-          🔔 通知を許可する
-        </button>
+  <div id="notification-details-container" style="display: none; flex-direction: column; gap: 10px; margin-top: 15px; border-top: 1px dashed #ddd; padding-top: 15px;">
+    <div class="input-group">
+      <label>通知の間隔（最低○時間あける）</label>
+      <input type="number" id="notify-interval-hours" value="1" min="1" max="24" onchange="saveNotificationSettings()">
+    </div>
+    <div style="display: flex; gap: 10px; justify-content: space-between;">
+      <div class="input-group" style="flex: 1;">
+        <label>通知開始（時）</label>
+        <input type="number" id="notify-start-hour" value="7" min="0" max="23" onchange="saveNotificationSettings()">
       </div>
+      <div class="input-group" style="flex: 1;">
+        <label>通知終了（時）</label>
+        <input type="number" id="notify-end-hour" value="23" min="0" max="23" onchange="saveNotificationSettings()">
+      </div>
+    </div>
+    <p style="font-size: 0.75rem; color: var(--text-sub); margin-top: -5px;">
+      ※設定を変更すると自動で保存されます。
+    </p>
+  </div>
+
+  <button class="btn-block btn-data" id="btn-request-notification" onclick="requestNotificationPermission()">
+    🔔 通知を許可する
+  </button>
+</div>
 
       <div
         style="
@@ -312,7 +332,6 @@
     <div id="modal-deck-menu" class="modal">
       <div class="modal-content">
         <h3>デッキメニュー</h3>
-        
         <div class="menu-section">
             <h4>📤 エクスポート (書き出し)</h4>
             <p class="desc-text">形式を選択してダウンロード</p>
@@ -348,6 +367,6 @@
       </div>
     </div>
 <script src="js/offline-check.js"></script>
-    <script type="module" src="js/script.js?v=1.0.14"></script>
+    <script type="module" src="js/script.js?v=1.0.15"></script>
   </body>
 </html>

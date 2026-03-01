@@ -1,6 +1,6 @@
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-// 👇 通知用の getToken を読み込む
+// 👇 通知用の getToken, deleteToken を読み込む
 import { getToken, deleteToken } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
 // 👇 firebase-init.js から messaging も受け取るように修正
 import { auth, db, messaging } from "./firebase-init.js";
@@ -77,8 +77,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 
-
-
 // --- 通知用トークンを取得してFirestoreに保存する関数 ---
 async function saveDeviceToken() {
     if (!currentUser) return;
@@ -87,7 +85,7 @@ async function saveDeviceToken() {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
             localStorage.setItem('notify_on_' + currentUser.uid, '1');
-            // 👇 修正ポイント：ここで確実に sw.js を登録し、準備完了を待つ
+            
             let registration;
             if ('serviceWorker' in navigator) {
                 registration = await navigator.serviceWorker.register('./sw.js');
@@ -117,6 +115,7 @@ async function saveDeviceToken() {
     }
 }
 
+// --- 通知を完全に無効化（DBからトークン削除）する関数 ---
 window.disableNotifications = async () => {
     if (!currentUser) return;
     try {
@@ -144,13 +143,20 @@ window.disableNotifications = async () => {
     }
 };
 
+// --- 通知のON/OFF切り替え ---
 window.toggleNotificationSetting = async () => {
-    const isChecked = document.getElementById('notification-toggle').checked;
-    if (isChecked) {
+    const toggle = document.getElementById('notification-toggle');
+    if (!currentUser) return;
+
+    if (toggle.checked) {
+        // オンにした時に、現在の値（初期値含む）をFirestoreに保存＆トークン取得
+        await saveNotificationSettings(); 
         await saveDeviceToken();
     } else {
+        // オフにした時に、DBのトークンも削除してサーバー通知を止める
         await disableNotifications();
     }
+    updateNotificationStatusDisplay();
 };
 
 // --- Login Bypass (Test Mode) ---
@@ -282,11 +288,12 @@ window.openSettings = () => {
     updateNotificationStatusDisplay();
 };
 
-function updateNotificationStatusDisplay() {
+async function updateNotificationStatusDisplay() {
     const statusDisplay = document.getElementById('notification-status-display');
     const btnRequest = document.getElementById('btn-request-notification');
     const toggleContainer = document.getElementById('notification-toggle-container');
     const toggleCheckbox = document.getElementById('notification-toggle');
+    const detailsContainer = document.getElementById('notification-details-container');
     
     if (!('Notification' in window)) {
         statusDisplay.innerText = "このブラウザはプッシュ通知をサポートしていません。";
@@ -294,6 +301,7 @@ function updateNotificationStatusDisplay() {
         statusDisplay.style.display = 'block';
         btnRequest.style.display = 'none';
         toggleContainer.style.display = 'none';
+        detailsContainer.style.display = 'none';
         return;
     }
 
@@ -303,20 +311,39 @@ function updateNotificationStatusDisplay() {
             btnRequest.style.display = 'none';
             toggleContainer.style.display = 'flex';
             toggleCheckbox.checked = (currentUser && localStorage.getItem('notify_on_' + currentUser.uid) === '1');
+            
+            // 👇 追加：通知がONの場合、Firestoreから詳細設定を読み込んで表示
+            if (toggleCheckbox.checked && currentUser) {
+                detailsContainer.style.display = 'flex';
+                const settingsRef = doc(db, "users", currentUser.uid, "settings", "notification");
+                const snap = await getDoc(settingsRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    document.getElementById('notify-interval-hours').value = data.intervalHours || 1;
+                    document.getElementById('notify-start-hour').value = data.startHour || 7;
+                    document.getElementById('notify-end-hour').value = data.endHour || 23;
+                }
+            } else {
+                detailsContainer.style.display = 'none';
+            }
             break;
+            
         case 'denied':
             statusDisplay.innerText = "通知は『ブロック』されています ❌\n(ブラウザの設定から解除してください)";
             statusDisplay.className = "user-email-display text-danger";
             statusDisplay.style.display = 'block';
             btnRequest.style.display = 'none';
             toggleContainer.style.display = 'none';
+            detailsContainer.style.display = 'none';
             break;
+            
         default:
             statusDisplay.innerText = "通知を受信するには許可が必要です。";
             statusDisplay.className = "user-email-display text-sub";
             statusDisplay.style.display = 'block';
             btnRequest.style.display = 'block';
             toggleContainer.style.display = 'none';
+            detailsContainer.style.display = 'none';
             break;
     }
 }
@@ -339,7 +366,6 @@ window.requestNotificationPermission = async () => {
     }
 };
 
-// --- 学習終了時に記録を保存するように変更 ---
 window.backToDecks = async () => { 
     if (sessionStartTime && sessionCardsCount > 0) {
         const duration = Math.floor((Date.now() - sessionStartTime) / 1000); 
@@ -367,7 +393,6 @@ window.createDeck = () => {
     }
 };
 
-// --- 学習開始時にセッション計測を開始 ---
 window.openStudy = (id) => {
     currentDeckId = id; isCramMode = false; sessionReviewedIds.clear(); historyStack = [];
     sessionStartTime = Date.now(); 
@@ -383,10 +408,8 @@ window.openStudy = (id) => {
 window.openManager = () => { switchView('manager-view'); renderManagerList(); };
 window.closeManager = () => { switchView('study-view'); refreshQueue(); };
 
-// --- Deck Menu (Export/Import) ---
 window.showDeckMenu = () => {
     document.getElementById('modal-deck-menu').classList.add('active');
-    // リセット
     document.getElementById('import-text-area').value = '';
     document.getElementById('fileInput').value = '';
 };
@@ -398,7 +421,6 @@ window.startCramMode = () => {
     refreshQueue(); 
 };
 
-// --- カード回答時にカウントアップ ---
 window.rateCard = (rating) => {
     if (!currentCard) return;
     sessionCardsCount++; 
@@ -484,7 +506,6 @@ window.deleteCard = () => {
     saveDeckToCloud(deck); window.closeModals(); renderManagerList();
 };
 
-// --- エクスポート機能 (CSV/TSV, 進捗あり/なし) ---
 window.exportDeckData = (format, withProgress) => {
     const deck = appData.decks.find(d => d.id === currentDeckId);
     if (!deck) return;
@@ -492,14 +513,12 @@ window.exportDeckData = (format, withProgress) => {
     let content = "";
     const delimiter = format === 'csv' ? ',' : '\t';
     
-    // ヘッダー行
     const headers = ["ID", "Question", "Answer", "Explanation"];
     if (withProgress) {
         headers.push("DueDate", "Interval", "Reps", "EF");
     }
     content += headers.map(h => escapeCell(h, delimiter)).join(delimiter) + "\n";
 
-    // データ行
     deck.cards.forEach(c => {
         const row = [
             c.displayId || "",
@@ -509,7 +528,6 @@ window.exportDeckData = (format, withProgress) => {
         ];
         
         if (withProgress) {
-            // 日付を ISO String にする (Excelでそのまま読める形式)
             const dateStr = c.dueDate ? new Date(c.dueDate).toISOString() : "";
             row.push(dateStr);
             row.push(c.interval);
@@ -520,8 +538,7 @@ window.exportDeckData = (format, withProgress) => {
         content += row.map(val => escapeCell(val, delimiter)).join(delimiter) + "\n";
     });
 
-    // ファイルダウンロード
-    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); // BOM
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]); 
     const blob = new Blob([bom, content], { type: format === 'csv' ? "text/csv" : "text/tab-separated-values" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -531,25 +548,21 @@ window.exportDeckData = (format, withProgress) => {
     URL.revokeObjectURL(url);
 };
 
-// セルのエスケープ処理
 function escapeCell(text, delimiter) {
     if (text === null || text === undefined) text = "";
     text = String(text);
-    // 改行、区切り文字、ダブルクォートがあれば全体を囲む
     if (text.includes('\n') || text.includes('\r') || text.includes(delimiter) || text.includes('"')) {
         return '"' + text.replace(/"/g, '""') + '"';
     }
     return text;
 }
 
-// --- インポート機能 (ファイル or テキスト貼り付け) ---
 window.executeImport = async () => {
     const fileInput = document.getElementById('fileInput');
     const textArea = document.getElementById('import-text-area');
     
     let content = "";
 
-    // ファイルが選択されていればファイルを優先
     if (fileInput.files && fileInput.files[0]) {
         const file = fileInput.files[0];
         try {
@@ -559,7 +572,6 @@ window.executeImport = async () => {
             return;
         }
     } else {
-        // ファイルがなければテキストエリアを使用
         content = textArea.value;
     }
 
@@ -584,7 +596,6 @@ function processImportContent(content) {
     const deck = appData.decks.find(d => d.id === currentDeckId);
     if (!deck) return;
 
-    // 区切り文字の自動判定
     const firstLineEnd = content.indexOf('\n');
     const firstLine = firstLineEnd > -1 ? content.substring(0, firstLineEnd) : content;
     const delimiter = firstLine.includes('\t') ? '\t' : ',';
@@ -595,10 +606,8 @@ function processImportContent(content) {
         
         rows.forEach((row, i) => {
             if (row.length === 0 || (row.length === 1 && !row[0].trim())) return;
-            // ヘッダー行スキップ (簡易判定)
             if (i === 0 && (row[0] === 'ID' || row[1] === 'Question')) return;
 
-            // 最低限 QとA
             const did = row[0] || "";
             const q = row[1] || "";
             const a = row[2] || "";
@@ -606,7 +615,6 @@ function processImportContent(content) {
             
             if (!q || !a) return; 
 
-            // 進捗データ読み込み
             let dueDate = 0;
             let interval = 0;
             let reps = 0;
@@ -726,7 +734,7 @@ window.restoreData = (input) => {
 };
 
 window.renameDeck = (id) => {
-    const deck = appData.decks.find(d => d.id === id);
+    const deck = appData.decks.find(id => id.id === id);
     const name = prompt("新しい名前:", deck.name);
     if(name && name!==deck.name) { deck.name=name; saveDeckToCloud(deck); renderSettingsDeckList(); }
 };
@@ -1010,7 +1018,6 @@ function updateButtonLabels() {
     });
 }
 
-// --- 統計保存ロジック ---
 async function saveStudyLog(count, seconds) {
     if (!currentUser) return;
     const today = new Date().toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' }).replaceAll('/', '-');
@@ -1024,7 +1031,6 @@ async function saveStudyLog(count, seconds) {
     }
 }
 
-// --- 統計表示ロジック ---
 window.openStats = async () => {
     switchView('stats-view');
     showLoading(true);
@@ -1125,3 +1131,25 @@ if ('serviceWorker' in navigator) {
             .catch(err => console.log('Service Worker registration failed:', err));
     });
 }
+
+
+window.saveNotificationSettings = async () => {
+    if (!currentUser) return;
+    
+    const interval = document.getElementById('notify-interval-hours').value;
+    const start = document.getElementById('notify-start-hour').value;
+    const end = document.getElementById('notify-end-hour').value;
+
+    try {
+        const settingsRef = doc(db, "users", currentUser.uid, "settings", "notification");
+        await setDoc(settingsRef, {
+            intervalHours: Number(interval),
+            startHour: Number(start),
+            endHour: Number(end),
+            updatedAt: Date.now()
+        }, { merge: true }); 
+        console.log("通知設定を保存しました:", { interval, start, end });
+    } catch (e) {
+        console.error("設定保存エラー:", e);
+    }
+};
