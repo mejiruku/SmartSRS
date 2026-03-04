@@ -157,6 +157,16 @@ h1 {
   background: #fee2e2;
   color: var(--danger);
 }
+.stat-badge.standby {
+  background: #f3f4f6;
+  color: var(--text-sub);
+}
+
+.deck-standby {
+  opacity: 0.6;
+  background-color: #f9fafb;
+}
+
 
 /* --- 学習画面 (中央揃え修正) --- */
 .scene {
@@ -427,6 +437,24 @@ h1 {
   background: #fef2f2;
   color: var(--danger);
 }
+
+/* --- Deck Toggle Switch (Smaller) --- */
+.toggle-switch.deck-toggle {
+  width: 40px;
+  height: 22px;
+  margin-right: 15px;
+  flex-shrink: 0;
+}
+.toggle-switch.deck-toggle .slider:before {
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+}
+.toggle-switch.deck-toggle input:checked + .slider:before {
+  transform: translateX(18px);
+}
+
 
 .manager-list {
   list-style: none;

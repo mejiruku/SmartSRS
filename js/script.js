@@ -250,7 +250,7 @@ async function loadDataFromCloud() {
             const docSnap = await getDoc(userDocRef);
             if (docSnap.exists() && docSnap.data().appData) {
                 appData = docSnap.data().appData;
-                appData.decks.forEach((d, i) => d.order = i);
+                appData.decks.forEach((d, i) => { d.order = i; if(!d.status) d.status = 'active'; });
                 for (const deck of appData.decks) {
                     await saveDeckToCloud(deck);
                 }
@@ -390,7 +390,7 @@ window.createDeck = () => {
     const name = document.getElementById('new-deck-name').value;
     if(name) {
         const maxOrder = appData.decks.length > 0 ? Math.max(...appData.decks.map(d => d.order || 0)) : 0;
-        const newDeck = { id:'d_'+Date.now(), name, cards:[], order: maxOrder + 1 };
+        const newDeck = { id:'d_'+Date.now(), name, cards:[], order: maxOrder + 1, status: 'active' };
         appData.decks.push(newDeck);
         saveDeckToCloud(newDeck); renderDeckList(); window.closeModals();
         document.getElementById('new-deck-name').value = '';
@@ -770,13 +770,21 @@ function renderDeckList() {
     appData.decks.forEach(deck => {
         const dueCount = deck.cards.filter(c => c.dueDate <= now).length;
         const el = document.createElement('div');
-        el.className = 'deck-card';
+        el.className = 'deck-card' + (deck.status === 'standby' ? ' deck-standby' : '');
         el.onclick = () => window.openStudy(deck.id);
+        
+        let statsHtml = '';
+        if (deck.status === 'standby') {
+             statsHtml = `<span class="stat-badge standby">💤 スタンバイ</span>`;
+        } else {
+             statsHtml = `<span class="stat-badge ${dueCount > 0 ? 'due' : ''}">学習待ち: ${dueCount}</span>`;
+        }
+        
         el.innerHTML = `
             <div class="deck-info">
                 <div class="deck-title">${deck.name}</div>
                 <div class="deck-stats">
-                    <span class="stat-badge ${dueCount > 0 ? 'due' : ''}">学習待ち: ${dueCount}</span>
+                    ${statsHtml}
                     <span class="stat-badge">合計: ${deck.cards.length}</span>
                 </div>
             </div>
@@ -787,6 +795,8 @@ function renderDeckList() {
     let earliestDue = Infinity;
     let totalDue = 0;
     appData.decks.forEach(deck => {
+        if (deck.status === 'standby') return; // スタンバイのデッキは除外
+        
         deck.cards.forEach(card => {
             if (card.dueDate <= now) totalDue++;
             else if (card.dueDate < earliestDue) earliestDue = card.dueDate;
@@ -826,12 +836,20 @@ function renderSettingsDeckList() {
         const isFirst = index === 0;
         const isLast = index === appData.decks.length - 1;
         const li = document.createElement('li');
+        const isStandby = deck.status === 'standby';
+        li.style.flexDirection = 'column';
+        li.style.alignItems = 'stretch';
+        li.style.gap = '8px';
         li.innerHTML = `
-            <div class="deck-name-row">
-                <span>${deck.name}</span>
-                <span class="deck-count-badge">${deck.cards.length}</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <label class="toggle-switch deck-toggle" title="学習中/スタンバイ切り替え">
+                    <input type="checkbox" onchange="toggleDeckStatus('${deck.id}')" ${!isStandby ? 'checked' : ''}>
+                    <span class="slider"></span>
+                </label>
+                <span style="flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; ${isStandby ? 'opacity:0.5; text-decoration:line-through; font-weight:normal;' : ''}">${deck.name}</span>
+                <span class="deck-count-badge" style="flex-shrink:0;">${deck.cards.length}</span>
             </div>
-            <div class="deck-actions-row" style="display:flex; gap:4px;">
+            <div style="display:flex; justify-content:flex-end; gap:4px;">
                 <button class="action-icon-btn" onclick="moveDeck('${deck.id}', -1)" ${isFirst ? 'disabled style="opacity:0.3"' : ''}>⬆</button>
                 <button class="action-icon-btn" onclick="moveDeck('${deck.id}', 1)" ${isLast ? 'disabled style="opacity:0.3"' : ''}>⬇</button>
                 <div style="width:10px;"></div>
@@ -842,6 +860,13 @@ function renderSettingsDeckList() {
         list.appendChild(li);
     });
 }
+window.toggleDeckStatus = async (id) => {
+    const deck = appData.decks.find(d => d.id === id);
+    if (!deck) return;
+    deck.status = deck.status === 'standby' ? 'active' : 'standby';
+    await saveDeckToCloud(deck);
+    renderSettingsDeckList();
+};
 
 window.moveDeck = async (id, dir) => {
     const idx = appData.decks.findIndex(d => d.id === id);
