@@ -1,11 +1,12 @@
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { doc, getDoc, setDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
-// 👇 通知用の getToken, deleteToken を読み込む
+// 👇 追加: query, where, getCountFromServer, writeBatch, orderBy, limit などを読み込む
+import { doc, getDoc, setDoc, collection, getDocs, deleteDoc, query, where, getCountFromServer, writeBatch, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { getToken, deleteToken } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging.js";
-// 👇 firebase-init.js から messaging も受け取るように修正
 import { auth, db, messaging } from "./firebase-init.js";
 
-let appData = { decks: [] };
+let appData = { decks: [] }; // デッキの基本情報（名前、ステータス等）だけを保持
+let currentDeckCards = [];   // 学習や管理画面を開いた時だけ、そのデッキのカード一覧をここに読み込む
+
 let currentUser = null;
 let currentDeckId = null;
 let studyQueue = [];
@@ -20,7 +21,6 @@ let sessionStartTime = null;
 let sessionCardsCount = 0;   
 
 const STORAGE_KEY = 'smart_srs_v3';
-// 【整理】VAPID キーを一か所で管理
 const VAPID_KEY = 'BNMUf79US783cO3ERIR9skf7p0XS81XIRx6eWuwWVSRIG5FuvAdntJYr6SgpAc3HNloSvADLBqhPf9oyoOVFsuA';
 
 const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), ms));
@@ -28,7 +28,6 @@ const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new E
 onAuthStateChanged(auth, async (user) => {
     const authView = document.getElementById('auth-view');
     if (user) {
-        // --- ログイン済みの処理 ---
         currentUser = user;
         document.getElementById('user-email-display').innerText = user.email;
         authView.style.display = 'none';
@@ -50,39 +49,29 @@ onAuthStateChanged(auth, async (user) => {
         switchView('deck-list-view');
         renderDeckList();
 
-        // ログイン完了後、以前に通知がONにされていればトークンを取得
         if (localStorage.getItem('notify_on_' + currentUser.uid) === '1') {
             saveDeviceToken();
         }
 
-        // 👇 通知からの遷移：URLパラメータをチェックして特定のデッキを開く
         const urlParams = new URLSearchParams(window.location.search);
         const targetDeckId = urlParams.get('openDeck');
         if (targetDeckId) {
             setTimeout(() => {
                 window.openStudy(targetDeckId);
-                // URLを綺麗にする
                 window.history.replaceState({}, document.title, window.location.pathname);
             }, 500);
         }
 
     } else {
-        // --- 未ログインの処理 ---
         currentUser = null;
         document.querySelectorAll('.container').forEach(el => el.style.display = 'none');
-        
         showLoading(false);
-        
-        // ログイン画面を表示
         authView.style.display = 'flex';
     }
 });
 
-
-// --- 通知用トークンを取得してFirestoreに保存する関数 ---
 async function saveDeviceToken() {
     if (!currentUser) return;
-    
     try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
@@ -91,10 +80,9 @@ async function saveDeviceToken() {
             let registration;
             if ('serviceWorker' in navigator) {
                 registration = await navigator.serviceWorker.register('./sw.js');
-                await navigator.serviceWorker.ready; // 準備ができるまで待機
+                await navigator.serviceWorker.ready;
             }
 
-            // 準備ができた sw.js をFirebaseに渡す
             const currentToken = await getToken(messaging, {
                 vapidKey: VAPID_KEY,
                 serviceWorkerRegistration: registration
@@ -102,7 +90,6 @@ async function saveDeviceToken() {
 
             if (currentToken) {
                 console.log('デバイストークンを取得:', currentToken);
-                // Firestoreの users/{uid}/tokens/{token} に保存する
                 const tokenRef = doc(db, "users", currentUser.uid, "tokens", currentToken);
                 await setDoc(tokenRef, {
                     token: currentToken,
@@ -117,7 +104,6 @@ async function saveDeviceToken() {
     }
 }
 
-// --- 通知を完全に無効化（DBからトークン削除）する関数 ---
 window.disableNotifications = async () => {
     if (!currentUser) return;
     try {
@@ -135,8 +121,8 @@ window.disableNotifications = async () => {
             });
             if (currentToken) {
                 const tokenRef = doc(db, "users", currentUser.uid, "tokens", currentToken);
-                await deleteDoc(tokenRef); // DBから削除
-                await deleteToken(messaging); // Firebase Messagingから削除
+                await deleteDoc(tokenRef);
+                await deleteToken(messaging);
                 console.log('通知トークンを削除しました。');
             }
         }
@@ -145,24 +131,19 @@ window.disableNotifications = async () => {
     }
 };
 
-// --- 通知のON/OFF切り替え ---
 window.toggleNotificationSetting = async () => {
     const toggle = document.getElementById('notification-toggle');
     if (!currentUser) return;
 
     if (toggle.checked) {
-        // オンにした時に、現在の値（初期値含む）をFirestoreに保存＆トークン取得
         await saveNotificationSettings(); 
         await saveDeviceToken();
     } else {
-        // オフにした時に、DBのトークンも削除してサーバー通知を止める
         await disableNotifications();
     }
-    // 【修正】非同期処理なので await を付けてエラーを捕捉できるようにする
     await updateNotificationStatusDisplay();
 };
 
-// --- Login Bypass (Test Mode) ---
 let loginPressTimer;
 const btnLogin = document.getElementById('btnLogin');
 
@@ -232,6 +213,7 @@ window.resetPassword = async () => {
     }
 };
 
+// --- サブコレクション仕様のデータ読み込み ---
 async function loadDataFromCloud() {
     if (!currentUser) return;
     const decksCol = collection(db, "users", currentUser.uid, "decks");
@@ -243,20 +225,11 @@ async function loadDataFromCloud() {
             let changed = false;
             appData.decks.forEach((d, i) => {
                 if (d.order === undefined) { d.order = i; changed = true; }
+                if (!d.status) { d.status = 'active'; changed = true; }
             });
             if (changed) { appData.decks.forEach(d => saveDeckToCloud(d)); }
         } else {
-            const userDocRef = doc(db, "users", currentUser.uid);
-            const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists() && docSnap.data().appData) {
-                appData = docSnap.data().appData;
-                appData.decks.forEach((d, i) => { d.order = i; if(!d.status) d.status = 'active'; });
-                for (const deck of appData.decks) {
-                    await saveDeckToCloud(deck);
-                }
-            } else {
-                 initDefaultData();
-            }
+            initDefaultData();
         }
     } catch (error) { console.error(error); alert("読込失敗"); }
 }
@@ -264,7 +237,8 @@ async function loadDataFromCloud() {
 async function saveDeckToCloud(deck) {
     if (!currentUser || !deck) return;
     try {
-        await setDoc(doc(db, "users", currentUser.uid, "decks", deck.id), deck);
+        const payload = { id: deck.id, name: deck.name, order: deck.order, status: deck.status };
+        await setDoc(doc(db, "users", currentUser.uid, "decks", deck.id), payload, { merge: true });
     } catch (e) { console.error(e); }
 }
 
@@ -277,9 +251,9 @@ async function deleteDeckFromCloud(deckId) {
 
 function initDefaultData() {
     appData = { decks: [] };
+    currentDeckCards = [];
 }
 
-// 【修正】async に変更し、内部の await を正しく扱えるようにする
 window.openSettings = async () => { 
     switchView('settings-view'); 
     renderSettingsDeckList(); 
@@ -287,8 +261,6 @@ window.openSettings = async () => {
     if (meta) {
         document.getElementById('app-version').innerText = meta.content;
     }
-    
-    // 【修正】通知状態の更新を await して非同期エラーを捕捉できるようにする
     await updateNotificationStatusDisplay();
 };
 
@@ -316,7 +288,6 @@ async function updateNotificationStatusDisplay() {
             toggleContainer.style.display = 'flex';
             toggleCheckbox.checked = (currentUser && localStorage.getItem('notify_on_' + currentUser.uid) === '1');
             
-            // 👇 追加：通知がONの場合、Firestoreから詳細設定を読み込んで表示
             if (toggleCheckbox.checked && currentUser) {
                 detailsContainer.style.display = 'flex';
                 const settingsRef = doc(db, "users", currentUser.uid, "settings", "notification");
@@ -377,6 +348,7 @@ window.backToDecks = async () => {
     }
     sessionStartTime = null;
     sessionCardsCount = 0;
+    currentDeckCards = []; // メモリ解放
     switchView('deck-list-view'); 
     renderDeckList(); 
     sessionReviewedIds.clear(); 
@@ -390,23 +362,41 @@ window.createDeck = () => {
     const name = document.getElementById('new-deck-name').value;
     if(name) {
         const maxOrder = appData.decks.length > 0 ? Math.max(...appData.decks.map(d => d.order || 0)) : 0;
-        const newDeck = { id:'d_'+Date.now(), name, cards:[], order: maxOrder + 1, status: 'active' };
+        const newDeck = { id:'d_'+Date.now(), name, order: maxOrder + 1, status: 'active' };
         appData.decks.push(newDeck);
-        saveDeckToCloud(newDeck); renderDeckList(); window.closeModals();
+        saveDeckToCloud(newDeck); 
+        renderDeckList(); 
+        window.closeModals();
         document.getElementById('new-deck-name').value = '';
     }
 };
 
-window.openStudy = (id) => {
+// --- 学習画面を開く時に「初めて」カード一覧をダウンロードする ---
+window.openStudy = async (id) => {
     currentDeckId = id; isCramMode = false; sessionReviewedIds.clear(); historyStack = [];
     sessionStartTime = Date.now(); 
     sessionCardsCount = 0;         
     const deck = appData.decks.find(d => d.id === id);
     if(!deck) return;
     document.getElementById('study-title').innerText = deck.name;
-    window.sessionTotal = deck.cards.filter(c => c.dueDate <= Date.now()).length; 
-    if(window.sessionTotal === 0 && deck.cards.length > 0) window.sessionTotal = deck.cards.length; 
-    switchView('study-view'); refreshQueue();
+    
+    showLoading(true);
+    try {
+        const cardsCol = collection(db, "users", currentUser.uid, "decks", id, "cards");
+        const snap = await getDocs(cardsCol);
+        currentDeckCards = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+
+        window.sessionTotal = currentDeckCards.filter(c => c.dueDate <= Date.now()).length; 
+        if(window.sessionTotal === 0 && currentDeckCards.length > 0) window.sessionTotal = currentDeckCards.length; 
+        
+        switchView('study-view'); 
+        refreshQueue();
+    } catch(e) {
+        console.error(e);
+        alert("カードの読み込みに失敗しました");
+    } finally {
+        showLoading(false);
+    }
 };
 
 window.openManager = () => { switchView('manager-view'); renderManagerList(); };
@@ -420,12 +410,11 @@ window.showDeckMenu = () => {
 
 window.startCramMode = () => { 
     isCramMode = true; sessionReviewedIds.clear(); historyStack = []; 
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    window.sessionTotal = deck.cards.length;
+    window.sessionTotal = currentDeckCards.length;
     refreshQueue(); 
 };
 
-window.rateCard = (rating) => {
+window.rateCard = async (rating) => {
     if (!currentCard) return;
     sessionCardsCount++; 
     document.querySelectorAll('.rate-btn').forEach(btn => btn.disabled = true);
@@ -434,24 +423,42 @@ window.rateCard = (rating) => {
     historyStack.push({ card: cardStateCopy, isCramMode: isCramMode });
     updateUndoButton();
     sessionReviewedIds.add(currentCard.id);
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    const idx = deck.cards.findIndex(c => c.id === currentCard.id);
+    
     const next = calculateNextState(currentCard, rating);
-    deck.cards[idx] = { ...currentCard, ...next };
-    saveDeckToCloud(deck); refreshQueue();
+    const updatedCard = { ...currentCard, ...next };
+
+    const idx = currentDeckCards.findIndex(c => c.id === currentCard.id);
+    if (idx !== -1) currentDeckCards[idx] = updatedCard;
+
+    try {
+        const cardRef = doc(db, "users", currentUser.uid, "decks", currentDeckId, "cards", currentCard.id);
+        await setDoc(cardRef, updatedCard, { merge: true });
+    } catch(e) {
+        console.error("保存エラー:", e);
+    }
+
+    refreshQueue();
 };
 
-window.handleUndo = () => {
+window.handleUndo = async () => {
     if (historyStack.length === 0) return;
     const prevState = historyStack.pop();
     const prevCard = prevState.card;
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    const idx = deck.cards.findIndex(c => c.id === prevCard.id);
-    if (idx !== -1) deck.cards[idx] = prevCard;
-    // 【修正】cramMode に限らず常に reviewedIds からカードを外す（通常モードでも Undo でキューに戻す）
+
+    const idx = currentDeckCards.findIndex(c => c.id === prevCard.id);
+    if (idx !== -1) currentDeckCards[idx] = prevCard;
+
     sessionReviewedIds.delete(prevCard.id);
     if (sessionCardsCount > 0) sessionCardsCount--; 
-    saveDeckToCloud(deck); refreshQueue(); updateUndoButton();
+
+    try {
+        const cardRef = doc(db, "users", currentUser.uid, "decks", currentDeckId, "cards", prevCard.id);
+        await setDoc(cardRef, prevCard, { merge: true });
+    } catch(e) {
+        console.error("Undoエラー:", e);
+    }
+
+    refreshQueue(); updateUndoButton();
 };
 
 function updateUndoButton() {
@@ -464,11 +471,8 @@ window.renderManagerList = renderManagerList;
 
 window.openEditModal = (cardId) => {
     editingCardId = cardId;
-    const deck = appData.decks.find(d => d.id === currentDeckId); 
-    if (!deck) return;
-    
     if (cardId) {
-        const card = deck.cards.find(c => c.id === cardId);
+        const card = currentDeckCards.find(c => c.id === cardId);
         document.getElementById('modal-card-title').innerText = "カード編集";
         document.getElementById('edit-display-id').value = card.displayId || "";
         document.getElementById('edit-q').value = card.question;
@@ -486,34 +490,61 @@ window.openEditModal = (cardId) => {
     document.getElementById('modal-card').classList.add('active');
 };
 
-window.saveCardEdit = () => {
-    const deck = appData.decks.find(d => d.id === currentDeckId);
+window.saveCardEdit = async () => {
     const did = document.getElementById('edit-display-id').value;
     const q = document.getElementById('edit-q').value;
     const a = document.getElementById('edit-a').value;
     const e = document.getElementById('edit-e').value;
     if (!q || !a) return alert("問題と答えは必須です");
-    if (editingCardId) {
-        const idx = deck.cards.findIndex(c => c.id === editingCardId);
-        if (idx > -1) {
-            deck.cards[idx].displayId = did; deck.cards[idx].question = q; deck.cards[idx].answer = a; deck.cards[idx].explanation = e;
+    
+    showLoading(true);
+    try {
+        const cardsCol = collection(db, "users", currentUser.uid, "decks", currentDeckId, "cards");
+        if (editingCardId) {
+            const idx = currentDeckCards.findIndex(c => c.id === editingCardId);
+            if (idx > -1) {
+                currentDeckCards[idx].displayId = did; 
+                currentDeckCards[idx].question = q; 
+                currentDeckCards[idx].answer = a; 
+                currentDeckCards[idx].explanation = e;
+
+                const cardRef = doc(cardsCol, editingCardId);
+                await setDoc(cardRef, currentDeckCards[idx], { merge: true });
+            }
+        } else {
+            const newCardRef = doc(cardsCol); 
+            const newCard = {
+                id: newCardRef.id,
+                displayId: did, question: q, answer: a, explanation: e, 
+                dueDate: 0, interval: 0, reps: 0, ef: 2.5
+            };
+            currentDeckCards.push(newCard);
+            await setDoc(newCardRef, newCard);
         }
-    } else {
-        deck.cards.push({ id: 'c_' + Date.now(), displayId: did, question: q, answer: a, explanation: e, dueDate: 0, interval: 0, reps: 0, ef: 2.5 });
+        window.closeModals(); renderManagerList();
+    } catch(err) {
+        console.error(err);
+        alert("カードの保存に失敗しました");
     }
-    saveDeckToCloud(deck); window.closeModals(); renderManagerList();
+    showLoading(false);
 };
 
-window.deleteCard = () => {
+window.deleteCard = async () => {
     if (!confirm("削除しますか？")) return;
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    deck.cards = deck.cards.filter(c => c.id !== editingCardId);
-    saveDeckToCloud(deck); window.closeModals(); renderManagerList();
+    showLoading(true);
+    try {
+        await deleteDoc(doc(db, "users", currentUser.uid, "decks", currentDeckId, "cards", editingCardId));
+        currentDeckCards = currentDeckCards.filter(c => c.id !== editingCardId);
+        window.closeModals(); renderManagerList();
+    } catch(e) {
+        console.error(e);
+        alert("削除に失敗しました");
+    }
+    showLoading(false);
 };
 
 window.exportDeckData = (format, withProgress) => {
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    if (!deck) return;
+    if (!currentDeckCards) return;
 
     let content = "";
     const delimiter = format === 'csv' ? ',' : '\t';
@@ -524,7 +555,7 @@ window.exportDeckData = (format, withProgress) => {
     }
     content += headers.map(h => escapeCell(h, delimiter)).join(delimiter) + "\n";
 
-    deck.cards.forEach(c => {
+    currentDeckCards.forEach(c => {
         const row = [
             c.displayId || "",
             c.question || "",
@@ -548,7 +579,7 @@ window.exportDeckData = (format, withProgress) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${deck.name}_${withProgress ? 'full' : 'cards'}.${format}`;
+    a.download = `deck_${withProgress ? 'full' : 'cards'}.${format}`;
     a.click();
     URL.revokeObjectURL(url);
 };
@@ -565,7 +596,6 @@ function escapeCell(text, delimiter) {
 window.executeImport = async () => {
     const fileInput = document.getElementById('fileInput');
     const textArea = document.getElementById('import-text-area');
-    
     let content = "";
 
     if (fileInput.files && fileInput.files[0]) {
@@ -585,7 +615,7 @@ window.executeImport = async () => {
         return;
     }
 
-    processImportContent(content);
+    await processImportContent(content);
 };
 
 function readFileAsync(file) {
@@ -597,28 +627,32 @@ function readFileAsync(file) {
     });
 }
 
-function processImportContent(content) {
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    if (!deck) return;
-
+// --- 最大500件ずつバッチ処理でインポート ---
+async function processImportContent(content) {
     const firstLineEnd = content.indexOf('\n');
     const firstLine = firstLineEnd > -1 ? content.substring(0, firstLineEnd) : content;
     const delimiter = firstLine.includes('\t') ? '\t' : ',';
 
+    showLoading(true);
     try {
         const rows = parseCSV(content, delimiter);
         let addedCount = 0;
         
-        rows.forEach((row, i) => {
-            if (row.length === 0 || (row.length === 1 && !row[0].trim())) return;
-            if (i === 0 && (row[0] === 'ID' || row[1] === 'Question')) return;
+        const cardsCol = collection(db, "users", currentUser.uid, "decks", currentDeckId, "cards");
+        let batch = writeBatch(db);
+        let operationCount = 0;
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            if (row.length === 0 || (row.length === 1 && !row[0].trim())) continue;
+            if (i === 0 && (row[0] === 'ID' || row[1] === 'Question')) continue;
 
             const did = row[0] || "";
             const q = row[1] || "";
             const a = row[2] || "";
             const exp = row[3] || "";
             
-            if (!q || !a) return; 
+            if (!q || !a) continue; 
 
             let dueDate = 0;
             let interval = 0;
@@ -637,21 +671,28 @@ function processImportContent(content) {
                 if (isNaN(ef)) ef = 2.5;
             }
 
-            deck.cards.push({
-                id: 'imp_' + Date.now() + '_' + i,
-                displayId: did,
-                question: q,
-                answer: a,
-                explanation: exp,
-                dueDate: dueDate,
-                interval: interval,
-                reps: reps,
-                ef: ef
-            });
+            const newCardRef = doc(cardsCol);
+            const newCard = {
+                id: newCardRef.id, displayId: did, question: q, answer: a, explanation: exp,
+                dueDate: dueDate, interval: interval, reps: reps, ef: ef
+            };
+            currentDeckCards.push(newCard);
+            
+            batch.set(newCardRef, newCard);
             addedCount++;
-        });
+            operationCount++;
 
-        saveDeckToCloud(deck);
+            if (operationCount === 490) {
+                await batch.commit();
+                batch = writeBatch(db);
+                operationCount = 0;
+            }
+        }
+
+        if (operationCount > 0) {
+            await batch.commit();
+        }
+
         window.closeModals();
         renderManagerList();
         alert(`${addedCount}件 インポートしました！`);
@@ -659,8 +700,9 @@ function processImportContent(content) {
 
     } catch (err) {
         console.error(err);
-        alert("インポートエラー。フォーマットを確認してください。");
+        alert("インポート中にエラーが発生しました。");
     }
+    showLoading(false);
 }
 
 function parseCSV(text, delimiter) {
@@ -710,12 +752,28 @@ function parseCSV(text, delimiter) {
     return rows;
 }
 
+window.exportAllData = async () => {
+    if (!currentUser) return;
+    showLoading(true);
+    try {
+        const fullData = { decks: [] };
+        for (const d of appData.decks) {
+            const deckCopy = { ...d, cards: [] };
+            const cardsCol = collection(db, "users", currentUser.uid, "decks", d.id, "cards");
+            const snap = await getDocs(cardsCol);
+            deckCopy.cards = snap.docs.map(doc => doc.data());
+            fullData.decks.push(deckCopy);
+        }
 
-window.exportAllData = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
-    const a = document.createElement('a');
-    a.href = dataStr; a.download = "backup_" + new Date().toISOString().slice(0,10) + ".json";
-    a.click();
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(fullData));
+        const a = document.createElement('a');
+        a.href = dataStr; a.download = "backup_" + new Date().toISOString().slice(0,10) + ".json";
+        a.click();
+    } catch (e) {
+        console.error(e);
+        alert("バックアップ作成に失敗しました");
+    }
+    showLoading(false);
 };
 
 window.restoreData = (input) => {
@@ -727,30 +785,81 @@ window.restoreData = (input) => {
             const data = JSON.parse(e.target.result);
             if (data.decks) {
                 if (confirm("上書き復元しますか？現在のデータは消去され、バックアップデータで上書きされます。")) {
-                    for(const d of appData.decks) { await deleteDeckFromCloud(d.id); }
-                    appData = data; 
-                    for(const d of appData.decks) { await saveDeckToCloud(d); }
-                    alert("復元完了"); renderSettingsDeckList(); 
+                    showLoading(true);
+                    
+                    // 現在のデータを全削除
+                    for (const d of appData.decks) {
+                        const cardsCol = collection(db, "users", currentUser.uid, "decks", d.id, "cards");
+                        const snap = await getDocs(cardsCol);
+                        const batch = writeBatch(db);
+                        snap.docs.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                        await deleteDeckFromCloud(d.id);
+                    }
+
+                    appData.decks = [];
+
+                    // 新しいデータを挿入
+                    for (const d of data.decks) {
+                        const newDeck = { id: d.id, name: d.name, order: d.order, status: d.status || 'active' };
+                        appData.decks.push(newDeck);
+                        await saveDeckToCloud(newDeck);
+
+                        if (d.cards && d.cards.length > 0) {
+                            const cardsCol = collection(db, "users", currentUser.uid, "decks", d.id, "cards");
+                            let batch = writeBatch(db);
+                            let count = 0;
+                            for (const c of d.cards) {
+                                const cardId = c.id || doc(cardsCol).id;
+                                c.id = cardId;
+                                batch.set(doc(cardsCol, cardId), c);
+                                count++;
+                                if (count === 490) {
+                                    await batch.commit();
+                                    batch = writeBatch(db);
+                                    count = 0;
+                                }
+                            }
+                            if (count > 0) await batch.commit();
+                        }
+                    }
+                    alert("復元完了"); renderSettingsDeckList(); renderDeckList();
+                    showLoading(false);
                 }
             }
-        } catch (err) { alert("読込失敗"); console.error(err); }
+        } catch (err) { alert("読込失敗"); console.error(err); showLoading(false); }
     };
     reader.readAsText(file); input.value = '';
 };
 
 window.renameDeck = (id) => {
-    // 【修正】find の仮引数を d に変更（id という名前だと外側の引数 id が隠れ、常に undefined になるバグを修正）
     const deck = appData.decks.find(d => d.id === id);
     if (!deck) return;
     const name = prompt("新しい名前:", deck.name);
-    if(name && name!==deck.name) { deck.name=name; saveDeckToCloud(deck); renderSettingsDeckList(); }
+    if(name && name!==deck.name) { deck.name=name; saveDeckToCloud(deck); renderSettingsDeckList(); renderDeckList(); }
 };
 
-window.deleteDeck = (id) => {
+window.deleteDeck = async (id) => {
     if(confirm("削除しますか？")) { 
-        appData.decks = appData.decks.filter(d => d.id !== id); 
-        deleteDeckFromCloud(id); 
-        renderSettingsDeckList(); 
+        showLoading(true);
+        try {
+            // まずサブコレクション（カード）を全て削除
+            const cardsCol = collection(db, "users", currentUser.uid, "decks", id, "cards");
+            const snap = await getDocs(cardsCol);
+            const batch = writeBatch(db);
+            snap.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+
+            // その後、デッキ本体を削除
+            await deleteDeckFromCloud(id); 
+
+            appData.decks = appData.decks.filter(d => d.id !== id); 
+            renderSettingsDeckList(); 
+        } catch(e) {
+            console.error(e);
+            alert("デッキの削除に失敗しました");
+        }
+        showLoading(false);
     }
 };
 
@@ -762,13 +871,21 @@ function switchView(viewId) {
     if(viewId === 'study-view') updateUndoButton();
 }
 
-function renderDeckList() {
+// --- カウント機能を使って通信量を節約して描画する ---
+async function renderDeckList() {
     appData.decks.sort((a,b) => (a.order||0) - (b.order||0));
     const grid = document.getElementById('deck-grid');
     grid.innerHTML = '';
     const now = Date.now();
+
+    if (appData.decks.length === 0) {
+        const infoEl = document.getElementById('next-study-text');
+        infoEl.innerText = 'デッキがありません';
+        return;
+    }
+
+    // 初回は「計算中...」で枠だけ作る
     appData.decks.forEach(deck => {
-        const dueCount = deck.cards.filter(c => c.dueDate <= now).length;
         const el = document.createElement('div');
         el.className = 'deck-card' + (deck.status === 'standby' ? ' deck-standby' : '');
         el.onclick = () => window.openStudy(deck.id);
@@ -777,7 +894,7 @@ function renderDeckList() {
         if (deck.status === 'standby') {
              statsHtml = `<span class="stat-badge standby">💤 スタンバイ</span>`;
         } else {
-             statsHtml = `<span class="stat-badge ${dueCount > 0 ? 'due' : ''}">学習待ち: ${dueCount}</span>`;
+             statsHtml = `<span class="stat-badge" id="due-badge-${deck.id}">学習待ち: 計算中...</span>`;
         }
         
         el.innerHTML = `
@@ -785,27 +902,57 @@ function renderDeckList() {
                 <div class="deck-title">${deck.name}</div>
                 <div class="deck-stats">
                     ${statsHtml}
-                    <span class="stat-badge">合計: ${deck.cards.length}</span>
+                    <span class="stat-badge" id="total-badge-${deck.id}">合計: 計算中...</span>
                 </div>
             </div>
         `;
         grid.appendChild(el);
     });
 
+    let totalDueOverall = 0;
     let earliestDue = Infinity;
-    let totalDue = 0;
-    appData.decks.forEach(deck => {
-        if (deck.status === 'standby') return; // スタンバイのデッキは除外
-        
-        deck.cards.forEach(card => {
-            if (card.dueDate <= now) totalDue++;
-            else if (card.dueDate < earliestDue) earliestDue = card.dueDate;
-        });
-    });
+
+    // 非同期でカードの枚数だけを取得する
+    for (const deck of appData.decks) {
+        try {
+            const cardsCol = collection(db, "users", currentUser.uid, "decks", deck.id, "cards");
+
+            const totalSnap = await getCountFromServer(cardsCol);
+            const totalCount = totalSnap.data().count;
+            const totalBadge = document.getElementById(`total-badge-${deck.id}`);
+            if (totalBadge) totalBadge.innerText = `合計: ${totalCount}`;
+
+            if (deck.status !== 'standby') {
+                const dueQuery = query(cardsCol, where("dueDate", "<=", now));
+                const dueSnap = await getCountFromServer(dueQuery);
+                const dueCount = dueSnap.data().count;
+
+                const dueBadge = document.getElementById(`due-badge-${deck.id}`);
+                if (dueBadge) {
+                    dueBadge.innerText = `学習待ち: ${dueCount}`;
+                    if (dueCount > 0) dueBadge.classList.add('due');
+                    else dueBadge.classList.remove('due');
+                }
+                totalDueOverall += dueCount;
+
+                // 学習待ちがない場合は、一番近い将来の復習日時を取得
+                if (dueCount === 0) {
+                    const nextQuery = query(cardsCol, where("dueDate", ">", now), orderBy("dueDate", "asc"), limit(1));
+                    const nextSnap = await getDocs(nextQuery);
+                    if (!nextSnap.empty) {
+                        const nextDate = nextSnap.docs[0].data().dueDate;
+                        if (nextDate < earliestDue) earliestDue = nextDate;
+                    }
+                }
+            }
+        } catch(e) {
+            console.error("カウント取得エラー", e);
+        }
+    }
 
     const infoEl = document.getElementById('next-study-text');
-    if (totalDue > 0) {
-        infoEl.innerText = totalDue + '件のカードが学習待ちです';
+    if (totalDueOverall > 0) {
+        infoEl.innerText = totalDueOverall + '件のカードが学習待ちです';
     } else if (earliestDue === Infinity) {
         infoEl.innerText = 'カードがありません';
     } else {
@@ -824,7 +971,7 @@ function renderDeckList() {
     }
 }
 
-function renderSettingsDeckList() {
+async function renderSettingsDeckList() {
     appData.decks.sort((a,b) => (a.order||0) - (b.order||0));
     const list = document.getElementById('settings-deck-list');
     list.innerHTML = '';
@@ -832,7 +979,9 @@ function renderSettingsDeckList() {
         list.innerHTML = '<li style="padding:20px; text-align:center; color:var(--text-sub);">デッキがありません</li>';
         return;
     }
-    appData.decks.forEach((deck, index) => {
+    
+    for (const deck of appData.decks) {
+        const index = appData.decks.indexOf(deck);
         const isFirst = index === 0;
         const isLast = index === appData.decks.length - 1;
         const li = document.createElement('li');
@@ -847,7 +996,7 @@ function renderSettingsDeckList() {
                     <span class="slider"></span>
                 </label>
                 <span style="flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; ${isStandby ? 'opacity:0.5; text-decoration:line-through; font-weight:normal;' : ''}">${deck.name}</span>
-                <span class="deck-count-badge" style="flex-shrink:0;">${deck.cards.length}</span>
+                <span class="deck-count-badge" id="settings-count-${deck.id}" style="flex-shrink:0;">...</span>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:4px;">
                 <button class="action-icon-btn" onclick="moveDeck('${deck.id}', -1)" ${isFirst ? 'disabled style="opacity:0.3"' : ''}>⬆</button>
@@ -858,8 +1007,16 @@ function renderSettingsDeckList() {
             </div>
         `;
         list.appendChild(li);
-    });
+
+        // 非同期で枚数を取得して表示
+        getCountFromServer(collection(db, "users", currentUser.uid, "decks", deck.id, "cards"))
+            .then(snap => {
+                const badge = document.getElementById(`settings-count-${deck.id}`);
+                if (badge) badge.innerText = snap.data().count;
+            }).catch(e => console.error(e));
+    }
 }
+
 window.toggleDeckStatus = async (id) => {
     const deck = appData.decks.find(d => d.id === id);
     if (!deck) return;
@@ -887,12 +1044,11 @@ window.moveDeck = async (id, dir) => {
 function renderManagerList() {
     const list = document.getElementById('manager-list');
     list.innerHTML = '';
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    if (!deck) return;
     const term = document.getElementById('search-input').value.toLowerCase();
     const btnBulk = document.getElementById('btn-bulk-delete');
     btnBulk.style.display = 'none'; 
-    [...deck.cards].reverse().forEach(card => {
+    
+    [...currentDeckCards].reverse().forEach(card => {
         if (term && !card.question.toLowerCase().includes(term)) return;
         const li = document.createElement('li');
         li.className = 'manager-item';
@@ -913,24 +1069,38 @@ window.toggleBulkButton = () => {
     document.getElementById('btn-bulk-delete').style.display = anyChecked ? 'block' : 'none';
 };
 
-window.deleteSelectedCards = () => {
+window.deleteSelectedCards = async () => {
     const checked = document.querySelectorAll('.card-chk:checked');
     if(checked.length === 0) return;
     if(!confirm(`${checked.length}枚のカードを削除しますか？`)) return;
-    const ids = Array.from(checked).map(c => c.value);
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    deck.cards = deck.cards.filter(c => !ids.includes(c.id));
-    saveDeckToCloud(deck); renderManagerList();
+    
+    showLoading(true);
+    try {
+        const ids = Array.from(checked).map(c => c.value);
+        const batch = writeBatch(db);
+
+        ids.forEach(id => {
+            const cardRef = doc(db, "users", currentUser.uid, "decks", currentDeckId, "cards", id);
+            batch.delete(cardRef);
+        });
+
+        await batch.commit();
+
+        currentDeckCards = currentDeckCards.filter(c => !ids.includes(c.id));
+        renderManagerList();
+    } catch(e) {
+        console.error(e);
+        alert("一括削除に失敗しました");
+    }
+    showLoading(false);
 };
 
 function refreshQueue() {
-    const deck = appData.decks.find(d => d.id === currentDeckId);
-    if (!deck) return;
     const now = Date.now();
     if (isCramMode) {
-        studyQueue = deck.cards.filter(c => c.dueDate > now && !sessionReviewedIds.has(c.id)).sort((a,b) => a.dueDate - b.dueDate);
+        studyQueue = currentDeckCards.filter(c => c.dueDate > now && !sessionReviewedIds.has(c.id)).sort((a,b) => a.dueDate - b.dueDate);
     } else {
-        studyQueue = deck.cards.filter(c => c.dueDate <= now).sort((a,b) => a.dueDate - b.dueDate);
+        studyQueue = currentDeckCards.filter(c => c.dueDate <= now).sort((a,b) => a.dueDate - b.dueDate);
     }
     const total = window.sessionTotal || 1; 
     const studied = sessionReviewedIds.size;
@@ -942,7 +1112,7 @@ function refreshQueue() {
         document.getElementById('card-scene').classList.add('hidden');
         document.getElementById('controls').classList.remove('visible');
         document.getElementById('empty-state').classList.remove('hidden');
-        const hasFuture = deck.cards.some(c => c.dueDate > now);
+        const hasFuture = currentDeckCards.some(c => c.dueDate > now);
         if(isCramMode) {
                 document.querySelector('#empty-state h2').innerText = "👏 学習完了！";
                 document.querySelector('#empty-state .primary-btn').style.display = 'none';
@@ -1163,7 +1333,6 @@ if ('serviceWorker' in navigator) {
             .catch(err => console.log('Service Worker registration failed:', err));
     });
 }
-
 
 window.saveNotificationSettings = async () => {
     if (!currentUser) return;
